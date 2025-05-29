@@ -1,0 +1,31 @@
+variable "settings" {
+  description = "Settings for the GitHub organization"
+  type = object({
+    billing_email                                                = string
+    company                                                      = optional(string, null)
+    blog                                                         = optional(string, null)
+    email                                                        = optional(string, null)
+    twitter_username                                             = optional(string, null)
+    location                                                     = optional(string, null)
+    name                                                         = optional(string, null)
+    description                                                  = optional(string, null)
+    has_organization_projects                                    = optional(bool, true)
+    has_repository_projects                                      = optional(bool, true)
+    default_repository_permission                                = optional(string, "read")
+    members_can_create_repositories                              = optional(bool, true)
+    members_can_create_public_repositories                       = optional(bool, true)
+    members_can_create_private_repositories                      = optional(bool, true)
+    members_can_create_internal_repositories                     = optional(bool, false)
+    members_can_create_pages                                     = optional(bool, true)
+    members_can_create_public_pages                              = optional(bool, true)
+    members_can_create_private_pages                             = optional(bool, true)
+    members_can_fork_private_repositories                        = optional(bool, false)
+    web_commit_signoff_required                                  = optional(bool, false)
+    advanced_security_enabled_for_new_repositories               = optional(bool, false)
+    dependabot_alerts_enabled_for_new_repositories               = optional(bool, false)
+    dependabot_security_updates_enabled_for_new_repositories     = optional(bool, false)
+    dependency_graph_enabled_for_new_repositories                = optional(bool, false)
+    secret_scanning_enabled_for_new_repositories                 = optional(bool, false)
+    secret_scanning_push_protection_enabled_for_new_repositories = optional(bool, false)
+  })
+}
