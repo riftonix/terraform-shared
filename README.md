@@ -8,12 +8,8 @@ To use one of the modules in your project, you can include it in your Terraform 
 
 ```hcl
 module "app_configuration" {
-  source = "git::https://github.com/vlomina/terraform.git//modules/module_name?ref=branch_name"
-
-  # Pass in the required variables for the module
-  variable_name1 = "value1"
-  variable_name2 = "value2"
-  # and so on...
+  source = "git::https://github.com/riftonix/terraform-shared.git//modules/helm-release?ref=helm-release/1.0.0"
+  ...
 }
 ```
 
@@ -25,14 +21,8 @@ Here's an example of how to use the `gitlab-project` module in your project:
 
     ```hcl
     module "my_gitlab_repo" {
-      source = "git::https://github.com/vlomina/terraform.git//modules/gitlab-project?ref=master"
-
-      var_1         = "my_app"
-      environment   = "production"
-      config_values = {
-        key1 = "value1"
-        key2 = "value2"
-      }
+      source = "git::https://github.com/riftonix/terraform-shared.git//modules/helm-release?ref=helm-release/1.0.0"
+      ...
     }
     ```
 
