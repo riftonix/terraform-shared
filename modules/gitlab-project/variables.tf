@@ -11,7 +11,7 @@ variable "group_id" {
 variable "default_branch" {
   description = "Gitlab default branch in project, i.e. main"
   type        = string
-  default     = "main"
+  default     = "master"
 }
 
 variable "description" {
@@ -101,10 +101,10 @@ variable "variables_description" {
   default     = "Managed by terraform"
 }
 
-variable "protect_default_branch" {
-  description = "Protect default branch or not"
-  type        = bool
-  default     = false
+variable "protected_branches" {
+  description = "Branches list to protect"
+  type        = list(string)
+  default     = []
 }
 
 variable "squash_option" {
@@ -123,4 +123,22 @@ variable "build_timeout" {
   description = "Gitlab job timeout"
   type        = number
   default     = 3600
+}
+
+variable "template_project_id" {
+  description = "Project ID of the custom template to use when creating the project"
+  type        = number
+  default     = null
+}
+
+variable "group_with_project_templates_id" {
+  description = "Group ID with templates"
+  type        = number
+  default     = null
+}
+
+variable "files" {
+  description = "Map of files to create in repo"
+  type        = map(string)
+  default     = {}
 }

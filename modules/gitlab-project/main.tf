@@ -30,6 +30,9 @@ resource "gitlab_project" "this" {
   archived                              = var.archived
   squash_option                         = var.squash_option
   build_timeout                         = var.build_timeout
+  use_custom_template                   = var.template_project_id != null ? true : false
+  template_project_id                   = var.template_project_id
+  group_with_project_templates_id       = var.group_with_project_templates_id
 
   push_rules {
     commit_message_regex = var.commit_message_regex
@@ -85,11 +88,11 @@ resource "gitlab_project_variable" "these" {
   description       = var.variables_description
 }
 
-resource "gitlab_branch_protection" "this" {
-  count = var.protect_default_branch ? 1 : 0
+resource "gitlab_branch_protection" "these" {
+  for_each = toset(var.protected_branches)
 
   project                = gitlab_project.this.id
-  branch                 = gitlab_project.this.default_branch
+  branch                 = each.key
   push_access_level      = "no one"
   allow_force_push       = false
   merge_access_level     = "developer"
@@ -100,4 +103,15 @@ resource "gitlab_project_job_token_scopes" "this" {
   project            = gitlab_project.this.id
   target_project_ids = []
   target_group_ids   = var.allowed_group_ids
+}
+
+resource "gitlab_repository_file" "these" {
+  for_each = var.files
+
+  project        = gitlab_project.this.id
+  file_path      = each.key
+  content        = each.value
+  branch         = var.default_branch
+  commit_message = "chore: update data from terraform"
+  encoding       = "text"
 }
