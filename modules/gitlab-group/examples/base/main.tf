@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "gitlab" {
-  token    = "glpat-gO69l8MpdO5HzHdHHJH-4286MQp1OmkwNWx4Cw.01.121mdiu0t"
+  token    = "<YOUR_GITLAB_TOKEN>"
   base_url = "https://gitlab.com/api/v4/"
 }
 
