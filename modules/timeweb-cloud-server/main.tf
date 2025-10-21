@@ -1,7 +1,8 @@
 locals {
   preset_id       = try(data.twc_presets.this[0].id, null)
   software_id     = try(data.twc_software.this[0].id, null)
-  os_id           = try(data.twc_os.this[0].id, data.twc_software.this[0].os[0].id)
+  image_id        = try(data.twc_image.this[0].id, null)
+  os_id           = try(try(data.twc_os.this[0].id, data.twc_software.this[0].os[0].id), null)
   project_id      = try(data.twc_projects.this[0].id, null)
   configurator_id = try(data.twc_configurator.this[0].id, null)
   ssh_keys_ids    = concat([for key in data.twc_ssh_keys.this : key.id], [for key in twc_ssh_key.this : key.id])
@@ -15,6 +16,13 @@ data "twc_os" "this" {
 
   name    = var.os.name
   version = var.os.version
+}
+
+data "twc_image" "this" {
+  count = var.image_name != null ? 1 : 0
+
+  name     = var.image_name
+  location = var.location
 }
 
 data "twc_software" "this" {
@@ -34,7 +42,6 @@ data "twc_presets" "this" {
 
   location      = var.location
   cpu_frequency = var.cpu_frequency
-  disk_type     = var.disk_type
 
   cpu  = var.preset.cpu
   ram  = 1024 * var.preset.ram
@@ -61,7 +68,6 @@ data "twc_configurator" "this" {
 
   location      = var.location
   cpu_frequency = var.cpu_frequency
-  disk_type     = var.disk_type
 }
 
 data "twc_projects" "this" {
@@ -83,6 +89,7 @@ resource "twc_server" "this" {
 
   preset_id = local.preset_id
 
+  image_id    = local.image_id
   os_id       = local.os_id
   software_id = local.software_id
   project_id  = local.project_id

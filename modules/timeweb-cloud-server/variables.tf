@@ -29,6 +29,14 @@ variable "create_floating_ip" {
   default     = false
 }
 
+variable "image_name" {
+  description = "Information about specified image"
+
+  type = string
+
+  default = null
+}
+
 variable "os" {
   description = "Information about specified OS"
 
@@ -37,10 +45,7 @@ variable "os" {
     version = string
   })
 
-  default = {
-    name    = "ubuntu"
-    version = "22.04"
-  }
+  default = null
 }
 
 variable "software" {
@@ -53,12 +58,7 @@ variable "software" {
     os_version = string
   })
 
-  default = {
-    name = "Wireguard-GUI"
-    os_family = "linux"
-    os_name = "ubuntu"
-    os_version = "22.04"
-  }
+  default = null
 }
 
 variable "ssh_keys" {
@@ -86,7 +86,7 @@ variable "cloud_init" {
 }
 
 variable "location" {
-  description = "Location for the server (ru-1, ru-2, pl-1, kz-1)"
+  description = "Location for the server (ru-1, ru-2, pl-1, kz-1, nl-1)"
   type        = string
   default     = null
 }
@@ -100,12 +100,6 @@ variable "cpu_frequency" {
     error_message = "Error! CPU frequency does not support"
   }
   default = 3.3
-}
-
-variable "disk_type" {
-  description = "Disk type for the created server (ssd, nvme, hdd)"
-  type        = string
-  default     = null
 }
 
 variable "preset" {
