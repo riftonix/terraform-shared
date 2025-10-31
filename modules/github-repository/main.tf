@@ -32,9 +32,11 @@ resource "github_repository" "this" {
   dynamic "pages" {
     for_each = var.pages == null ? [] : [var.pages]
     content {
+      build_type = try(pages.value.build_type, null)
+      cname      = try(pages.value.cname, null)
       source {
-        branch = pages.value.branch
-        path   = pages.value.path
+        branch = try(pages.value.branch, null)
+        path   = try(pages.value.path, null)
       }
     }
   }

@@ -90,8 +90,10 @@ variable "homepage_url" {
 variable "pages" {
   description = "GitHub Pages configuration"
   type = object({
-    branch = string
-    path   = string
+    build_type = optional(string)
+    cname      = optional(string)
+    branch     = optional(string)
+    path       = optional(string)
   })
   default = null
 }
