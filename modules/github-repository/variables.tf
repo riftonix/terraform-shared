@@ -111,3 +111,12 @@ variable "repository_default_branch" {
   type        = string
   default     = "master"
 }
+
+variable "template" {
+  type = object({
+    owner                = string
+    repository           = string
+    include_all_branches = optional(bool, false)
+  })
+  default = null
+}

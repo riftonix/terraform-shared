@@ -12,13 +12,22 @@ resource "github_repository" "this" {
   allow_squash_merge = var.allow_squash_merge
   allow_rebase_merge = var.allow_rebase_merge
 
-  auto_init          = var.auto_init
-  gitignore_template = var.gitignore_template
-  license_template   = var.license_template
+  auto_init          = var.template == null ? var.auto_init : null
+  gitignore_template = var.template == null ? var.gitignore_template : null
+  license_template   = var.template == null ? var.license_template : null
 
   homepage_url = var.homepage_url
 
   topics = var.topics
+
+  dynamic "template" {
+    for_each = var.template != null ? [var.template] : []
+    content {
+      owner                = template.value.owner
+      repository           = template.value.repository
+      include_all_branches = template.value.include_all_branches
+    }
+  }
 
   dynamic "pages" {
     for_each = var.pages == null ? [] : [var.pages]
