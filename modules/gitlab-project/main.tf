@@ -34,8 +34,11 @@ resource "gitlab_project" "this" {
   template_project_id                   = var.template_project_id
   group_with_project_templates_id       = var.group_with_project_templates_id
 
-  push_rules {
-    commit_message_regex = var.commit_message_regex
+  dynamic "push_rules" {
+    for_each = var.commit_message_regex == null ? [] : [var.commit_message_regex]
+    content {
+      commit_message_regex = var.commit_message_regex
+    }
   }
 }
 
