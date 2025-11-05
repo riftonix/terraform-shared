@@ -4,22 +4,22 @@ variable "folder_uid" {
 }
 
 variable "dashboards" {
-  description = "Список дашбордов для создания. Каждый должен содержать title, uid и body"
+  description = "Dashboards list to create"
   type = list(object({
     title         = optional(string)
     uid           = optional(string)
-    body          = any
+    body          = string
   }))
 }
 
 variable "org_id" {
-  description = "ID организации Grafana"
+  description = "Grafana org ID"
   type        = string
   default     = null
 }
 
 variable "overwrite" {
-  description = "ID организации Grafana"
+  description = "Overwrite grafana dashboard"
   type        = bool
   default     = true
 }

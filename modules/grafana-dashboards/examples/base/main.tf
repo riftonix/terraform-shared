@@ -15,10 +15,10 @@ provider "grafana" {
 
 module "kafka_dashboards" {
   source = "../../"
-  folder_uid = "cesbbhbyyuhvka"
+  folder_uid = "0"
   dashboards = [
     {
-      body = jsondecode(file("dashboards/strimzi-cruise-control.json"))
+      body = file("dashboards/strimzi-cruise-control.json")
     }
   ]
 }
