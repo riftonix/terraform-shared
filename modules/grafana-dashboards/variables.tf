@@ -3,13 +3,16 @@ variable "folder_uid" {
   type        = string
 }
 
+variable "global_jq_expression" {
+  description = "Jq expression for dashboard modification"
+  type        = string
+  default     = null
+}
+
 variable "dashboards" {
-  description = "Dashboards list to create"
-  type = list(object({
-    title         = optional(string)
-    uid           = optional(string)
-    body          = string
-  }))
+  description = "Map of dashboard file paths to optional jq expressions for transformation"
+  type        = map(string)
+  default     = {}
 }
 
 variable "org_id" {
