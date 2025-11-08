@@ -22,12 +22,12 @@ module "twc_server_ubuntu" {
   source = "../../"
 
   name               = "ubuntu"
-  location           = "nl-1"
-  availability_zone  = "ams-1"
+  location           = "ru-1"
+  availability_zone  = "spb-3"
   create_floating_ip = false
 
   os = {
-    name = "ubuntu"
+    name    = "ubuntu"
     version = "22.04"
   }
 

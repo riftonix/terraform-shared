@@ -110,6 +110,16 @@ resource "twc_server" "this" {
     }
   }
 
+  dynamic "local_network" {
+    for_each = var.local_network == null ? [] : [var.local_network]
+
+    content {
+      id   = local_network.value.id
+      ip   = local_network.value.ip
+      mode = local_network.value.mode
+    }
+  }
+
   lifecycle {
     ignore_changes = [ssh_keys_ids]
   }

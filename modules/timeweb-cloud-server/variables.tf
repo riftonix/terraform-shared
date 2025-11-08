@@ -61,6 +61,18 @@ variable "software" {
   default = null
 }
 
+variable "local_network" {
+  description = "Local network configuration"
+
+  type = object({
+    id   = string
+    ip   = optional(string)
+    mode = optional(string)
+  })
+
+  default = null
+}
+
 variable "ssh_keys" {
   description = "List of names SSH Keys for server"
   type        = list(string)
