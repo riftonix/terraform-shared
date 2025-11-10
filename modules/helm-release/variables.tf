@@ -37,7 +37,7 @@ variable "set" {
   type = list(object({
     name  = string
     value = string
-    type  = optional(string)  // "auto" или "string"
+    type  = optional(string) // "auto" или "string"
   }))
   default = []
 }

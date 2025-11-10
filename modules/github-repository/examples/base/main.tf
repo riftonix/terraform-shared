@@ -20,6 +20,6 @@ provider "github" {
 module "github_repository_example" {
   source = "../../"
 
-  name        = "example"
+  name      = "example"
   auto_init = true
 }

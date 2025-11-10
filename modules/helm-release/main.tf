@@ -6,9 +6,9 @@ resource "helm_release" "this" {
   version          = var.chart_version
   create_namespace = var.create_namespace
 
-  wait     = var.wait
-  timeout  = var.timeout
-  atomic   = var.atomic
+  wait    = var.wait
+  timeout = var.timeout
+  atomic  = var.atomic
 
   set = [
     for s in var.set : {

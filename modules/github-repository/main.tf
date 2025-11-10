@@ -62,7 +62,7 @@ resource "github_branch" "default" {
   branch     = var.repository_default_branch
 }
 
-resource "github_branch_default" "this"{
+resource "github_branch_default" "this" {
   repository = github_repository.this.name
   branch     = github_branch.default.branch
 }

@@ -13,7 +13,7 @@ provider "kubectl" {
 }
 
 module "k8s_apply" {
-  source    = "../../"
+  source = "../../"
 
   manifest_content = file("rbac.yaml")
 }

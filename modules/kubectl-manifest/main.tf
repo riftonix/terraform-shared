@@ -3,7 +3,7 @@ data "kubectl_file_documents" "these" {
 }
 
 resource "kubectl_manifest" "resources" {
-  for_each  = data.kubectl_file_documents.these.manifests
+  for_each = data.kubectl_file_documents.these.manifests
 
   yaml_body          = each.value
   sensitive_fields   = var.sensitive_fields

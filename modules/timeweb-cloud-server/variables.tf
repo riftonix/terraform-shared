@@ -89,7 +89,7 @@ variable "ssh_keys_paths" {
 }
 
 variable "cloud_init" {
-  description = "Cloud-init script path to file"
+  description = "Cloud-init script configuration"
   type = object({
     file = string
     vars = optional(map(string))
