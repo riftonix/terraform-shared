@@ -144,6 +144,12 @@ variable "allowed_group_ids" {
   default     = []
 }
 
+variable "allowed_project_ids" {
+  description = "Allowed projects to trigger pipelines"
+  type        = list(any)
+  default     = []
+}
+
 variable "build_timeout" {
   description = "Gitlab job timeout"
   type        = number
