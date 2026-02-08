@@ -131,7 +131,7 @@ resource "gitlab_branch_protection" "these" {
 }
 
 resource "gitlab_project_job_token_scopes" "this" {
-  for_each = length(var.allowed_group_ids) + length(var.allowed_project_ids) > 0 ? { default = true } : {}
+  count = length(var.allowed_group_ids) + length(var.allowed_project_ids) > 0 ? 1 : 0
 
   project            = gitlab_project.this.id
   target_project_ids = var.allowed_project_ids
