@@ -115,19 +115,29 @@ variable "protected_branches" {
     unprotect_access_level       = optional(string, "maintainer")
     allow_force_push             = optional(bool, false)
     code_owner_approval_required = optional(bool, false)
-    allowed_to_push = optional(list(object({
-      user_id       = optional(number)
-      group_id      = optional(number)
-      deploy_key_id = optional(number)
-    })), [])
-    allowed_to_merge = optional(list(object({
-      user_id  = optional(number)
-      group_id = optional(number)
-    })), [])
-    allowed_to_unprotect = optional(list(object({
-      user_id  = optional(number)
-      group_id = optional(number)
-    })), [])
+    allowed_to_push = optional(object({
+      user_ids       = optional(list(number), [])
+      group_ids      = optional(list(number), [])
+      deploy_key_ids = optional(list(number), [])
+    }), {
+      user_ids       = []
+      group_ids      = []
+      deploy_key_ids = []
+    })
+    allowed_to_merge = optional(object({
+      user_ids  = optional(list(number), [])
+      group_ids = optional(list(number), [])
+    }), {
+      user_ids  = []
+      group_ids = []
+    })
+    allowed_to_unprotect = optional(object({
+      user_ids  = optional(list(number), [])
+      group_ids = optional(list(number), [])
+    }), {
+      user_ids  = []
+      group_ids = []
+    })
   }))
   default = {}
 }
@@ -173,4 +183,3 @@ variable "files" {
   type        = map(string)
   default     = {}
 }
-

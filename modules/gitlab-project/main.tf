@@ -12,6 +12,29 @@ locals {
       }
     ]
   ])
+
+  protected_branches_expanded = {
+    for branch, config in var.protected_branches : branch => {
+      push_access_level            = config.push_access_level
+      merge_access_level           = config.merge_access_level
+      unprotect_access_level       = config.unprotect_access_level
+      allow_force_push             = config.allow_force_push
+      code_owner_approval_required = config.code_owner_approval_required
+      allowed_to_push_entries = concat(
+        [for user_id in config.allowed_to_push.user_ids : { user_id = user_id }],
+        [for group_id in config.allowed_to_push.group_ids : { group_id = group_id }],
+        [for deploy_key_id in config.allowed_to_push.deploy_key_ids : { deploy_key_id = deploy_key_id }]
+      )
+      allowed_to_merge_entries = concat(
+        [for user_id in config.allowed_to_merge.user_ids : { user_id = user_id }],
+        [for group_id in config.allowed_to_merge.group_ids : { group_id = group_id }]
+      )
+      allowed_to_unprotect_entries = concat(
+        [for user_id in config.allowed_to_unprotect.user_ids : { user_id = user_id }],
+        [for group_id in config.allowed_to_unprotect.group_ids : { group_id = group_id }]
+      )
+    }
+  }
 }
 
 resource "gitlab_project" "this" {
@@ -94,7 +117,7 @@ resource "gitlab_project_variable" "these" {
 }
 
 resource "gitlab_branch_protection" "these" {
-  for_each = var.protected_branches
+  for_each = local.protected_branches_expanded
 
   project                      = gitlab_project.this.id
   branch                       = each.key
@@ -105,27 +128,27 @@ resource "gitlab_branch_protection" "these" {
   code_owner_approval_required = each.value.code_owner_approval_required
 
   dynamic "allowed_to_push" {
-    for_each = each.value.allowed_to_push
+    for_each = each.value.allowed_to_push_entries
     content {
-      user_id       = allowed_to_push.value.user_id
-      group_id      = allowed_to_push.value.group_id
-      deploy_key_id = allowed_to_push.value.deploy_key_id
+      user_id       = try(allowed_to_push.value.user_id, null)
+      group_id      = try(allowed_to_push.value.group_id, null)
+      deploy_key_id = try(allowed_to_push.value.deploy_key_id, null)
     }
   }
 
   dynamic "allowed_to_merge" {
-    for_each = each.value.allowed_to_merge
+    for_each = each.value.allowed_to_merge_entries
     content {
-      user_id  = allowed_to_merge.value.user_id
-      group_id = allowed_to_merge.value.group_id
+      user_id  = try(allowed_to_merge.value.user_id, null)
+      group_id = try(allowed_to_merge.value.group_id, null)
     }
   }
 
   dynamic "allowed_to_unprotect" {
-    for_each = each.value.allowed_to_unprotect
+    for_each = each.value.allowed_to_unprotect_entries
     content {
-      user_id  = allowed_to_unprotect.value.user_id
-      group_id = allowed_to_unprotect.value.group_id
+      user_id  = try(allowed_to_unprotect.value.user_id, null)
+      group_id = try(allowed_to_unprotect.value.group_id, null)
     }
   }
 }
