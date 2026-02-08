@@ -20,6 +20,8 @@ resource "gitlab_project" "this" {
   namespace_id                          = var.group_id
   default_branch                        = var.default_branch
   description                           = var.description
+  avatar                                = var.avatar_path
+  avatar_hash                           = var.avatar_path != "" ? filesha256(var.avatar_path) : null
   initialize_with_readme                = var.initialize_with_readme
   only_allow_merge_if_pipeline_succeeds = var.only_allow_merge_if_pipeline_succeeds
   remove_source_branch_after_merge      = var.remove_source_branch_after_merge
@@ -92,14 +94,40 @@ resource "gitlab_project_variable" "these" {
 }
 
 resource "gitlab_branch_protection" "these" {
-  for_each = toset(var.protected_branches)
+  for_each = var.protected_branches
 
-  project                = gitlab_project.this.id
-  branch                 = each.key
-  push_access_level      = "no one"
-  allow_force_push       = false
-  merge_access_level     = "developer"
-  unprotect_access_level = "maintainer"
+  project                      = gitlab_project.this.id
+  branch                       = each.key
+  push_access_level            = each.value.push_access_level
+  merge_access_level           = each.value.merge_access_level
+  unprotect_access_level       = each.value.unprotect_access_level
+  allow_force_push             = each.value.allow_force_push
+  code_owner_approval_required = each.value.code_owner_approval_required
+
+  dynamic "allowed_to_push" {
+    for_each = each.value.allowed_to_push
+    content {
+      user_id       = allowed_to_push.value.user_id
+      group_id      = allowed_to_push.value.group_id
+      deploy_key_id = allowed_to_push.value.deploy_key_id
+    }
+  }
+
+  dynamic "allowed_to_merge" {
+    for_each = each.value.allowed_to_merge
+    content {
+      user_id  = allowed_to_merge.value.user_id
+      group_id = allowed_to_merge.value.group_id
+    }
+  }
+
+  dynamic "allowed_to_unprotect" {
+    for_each = each.value.allowed_to_unprotect
+    content {
+      user_id  = allowed_to_unprotect.value.user_id
+      group_id = allowed_to_unprotect.value.group_id
+    }
+  }
 }
 
 resource "gitlab_project_job_token_scopes" "this" {

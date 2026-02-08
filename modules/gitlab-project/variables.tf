@@ -20,6 +20,12 @@ variable "description" {
   default     = ""
 }
 
+variable "avatar_path" {
+  description = "Gitlab group avatar path"
+  type        = string
+  default     = ""
+}
+
 variable "initialize_with_readme" {
   description = "Is gitlab project will be with default readme or not"
   type        = bool
@@ -102,9 +108,28 @@ variable "variables_description" {
 }
 
 variable "protected_branches" {
-  description = "Branches list to protect"
-  type        = list(string)
-  default     = []
+  description = "Protected branches map: key is branch name, value is branch protection settings"
+  type = map(object({
+    push_access_level            = optional(string, "no one")
+    merge_access_level           = optional(string, "developer")
+    unprotect_access_level       = optional(string, "maintainer")
+    allow_force_push             = optional(bool, false)
+    code_owner_approval_required = optional(bool, false)
+    allowed_to_push = optional(list(object({
+      user_id       = optional(number)
+      group_id      = optional(number)
+      deploy_key_id = optional(number)
+    })), [])
+    allowed_to_merge = optional(list(object({
+      user_id  = optional(number)
+      group_id = optional(number)
+    })), [])
+    allowed_to_unprotect = optional(list(object({
+      user_id  = optional(number)
+      group_id = optional(number)
+    })), [])
+  }))
+  default = {}
 }
 
 variable "squash_option" {
