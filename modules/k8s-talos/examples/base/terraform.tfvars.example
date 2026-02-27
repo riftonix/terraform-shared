@@ -1,0 +1,36 @@
+cluster_name         = "demo-talos"
+talos_version        = "v1.9.4"
+kubernetes_version   = "1.32.0"
+cluster_endpoint_host = "10.0.0.10"
+
+control_plane_nodes = [
+  {
+    name     = "cp-1"
+    node     = "10.0.0.11"
+    endpoint = "10.0.0.11"
+  },
+  {
+    name     = "cp-2"
+    node     = "10.0.0.12"
+    endpoint = "10.0.0.12"
+  },
+  {
+    name     = "cp-3"
+    node     = "10.0.0.13"
+    endpoint = "10.0.0.13"
+  }
+]
+
+worker_nodes = [
+  {
+    name     = "w-1"
+    node     = "10.0.0.21"
+    endpoint = "10.0.0.21"
+  },
+  {
+    name     = "w-2"
+    node     = "10.0.0.22"
+    endpoint = "10.0.0.22"
+  }
+]
+

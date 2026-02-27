@@ -43,3 +43,4 @@ terraform.rc
 
 # Tmp
 modules/vsphere-virtual-machine
+sources/

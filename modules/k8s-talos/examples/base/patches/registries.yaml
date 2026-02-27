@@ -1,0 +1,16 @@
+machine:
+  registries:
+    mirrors:
+      docker.io:
+        endpoints:
+          - https://registry-1.docker.io
+      ghcr.io:
+        endpoints:
+          - https://ghcr.io
+      gcr.io:
+        endpoints:
+          - https://gcr.io
+      registry.k8s.io:
+        endpoints:
+          - https://registry.k8s.io
+
