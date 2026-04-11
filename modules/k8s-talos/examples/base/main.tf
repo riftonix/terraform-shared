@@ -18,8 +18,8 @@ module "k8s_talos" {
   cluster_endpoint_host = var.cluster_endpoint_host
 
   # Existing Talos nodes (VMs are NOT created by this module).
-  control_plane_nodes = var.control_plane_nodes
-  worker_nodes        = var.worker_nodes
+  control_plane_nodes_map = var.control_plane_nodes_map
+  worker_node_maps        = var.worker_node_maps
 
   # Same idea as in terraform-hcloud-talos-main: common per-role patches.
   control_plane_config_patches = [

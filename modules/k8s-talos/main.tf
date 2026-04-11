@@ -3,40 +3,72 @@ resource "talos_machine_secrets" "this" {
 }
 
 locals {
+  control_plane_nodes = [
+    for name in sort(keys(var.control_plane_nodes_map)) : merge(
+      {
+        name = name
+      },
+      var.control_plane_defaults,
+      var.control_plane_nodes_map[name]
+    )
+  ]
+
+  worker_nodes_map_merged = length(var.worker_node_maps) > 0 ? merge(var.worker_node_maps...) : {}
+
+  worker_nodes = [
+    for name in sort(keys(local.worker_nodes_map_merged)) : merge(
+      {
+        name = name
+      },
+      var.worker_defaults,
+      local.worker_nodes_map_merged[name]
+    )
+  ]
+
   control_plane_nodes_by_name = {
-    for node in var.control_plane_nodes : node.name => merge(node, {
+    for node in local.control_plane_nodes : node.name => merge(node, {
       endpoint = try(node.endpoint, node.node)
     })
   }
 
   worker_nodes_by_name = {
-    for node in var.worker_nodes : node.name => merge(node, {
+    for node in local.worker_nodes : node.name => merge(node, {
       endpoint = try(node.endpoint, node.node)
     })
   }
 
+  rollout_control_plane_nodes_by_name = var.rollout_control_plane_names == null ? local.control_plane_nodes_by_name : {
+    for name, node in local.control_plane_nodes_by_name : name => node
+    if contains(var.rollout_control_plane_names, name)
+  }
+
+  rollout_worker_nodes_by_name = var.rollout_worker_names == null ? local.worker_nodes_by_name : {
+    for name, node in local.worker_nodes_by_name : name => node
+    if contains(var.rollout_worker_names, name)
+  }
+
   cluster_endpoint_host = coalesce(
     var.cluster_endpoint_host,
-    try(var.control_plane_nodes[0].endpoint, var.control_plane_nodes[0].node)
+    try(local.control_plane_nodes[0].endpoint, local.control_plane_nodes[0].node)
   )
 
   cluster_endpoint = "https://${local.cluster_endpoint_host}:${var.cluster_endpoint_port}"
 
-  bootstrap_node = coalesce(var.bootstrap_node, var.control_plane_nodes[0].node)
+  bootstrap_node = coalesce(var.bootstrap_node, local.control_plane_nodes[0].node)
   bootstrap_endpoint = coalesce(
     var.bootstrap_endpoint,
-    try(var.control_plane_nodes[0].endpoint, var.control_plane_nodes[0].node)
+    try(local.control_plane_nodes[0].endpoint, local.control_plane_nodes[0].node)
   )
 
   talosconfig_endpoints = length(var.talosconfig_endpoints) > 0 ? var.talosconfig_endpoints : [
-    for node in var.control_plane_nodes : try(node.endpoint, node.node)
+    for node in local.control_plane_nodes : try(node.endpoint, node.node)
   ]
 
   base_cert_sans = distinct(compact(concat(
     [local.cluster_endpoint_host],
     var.additional_api_server_cert_sans,
-    [for node in var.control_plane_nodes : node.node],
-    [for node in var.control_plane_nodes : try(node.endpoint, node.node)]
+    [for node in local.control_plane_nodes : node.node],
+    [for node in local.control_plane_nodes : try(node.endpoint, node.node)]
   )))
 
   control_plane_base_patches = {
@@ -68,7 +100,7 @@ locals {
         } : {}
       )
       cluster = {
-        allowSchedulingOnControlPlanes = var.control_plane_allow_schedule || length(var.worker_nodes) == 0
+        allowSchedulingOnControlPlanes = var.control_plane_allow_schedule || length(local.worker_nodes) == 0
       }
     })
   }
@@ -102,6 +134,13 @@ locals {
         } : {}
       )
     })
+  }
+}
+
+check "control_plane_nodes_present" {
+  assert {
+    condition     = length(local.control_plane_nodes) > 0
+    error_message = "At least one control-plane node must be provided via control_plane_nodes_map."
   }
 }
 
@@ -142,7 +181,7 @@ data "talos_machine_configuration" "worker" {
 }
 
 resource "talos_machine_configuration_apply" "control_plane" {
-  for_each = local.control_plane_nodes_by_name
+  for_each = local.rollout_control_plane_nodes_by_name
 
   client_configuration        = talos_machine_secrets.this.client_configuration
   machine_configuration_input = data.talos_machine_configuration.control_plane[each.key].machine_configuration
@@ -152,7 +191,7 @@ resource "talos_machine_configuration_apply" "control_plane" {
 }
 
 resource "talos_machine_configuration_apply" "worker" {
-  for_each = local.worker_nodes_by_name
+  for_each = local.rollout_worker_nodes_by_name
 
   client_configuration        = talos_machine_secrets.this.client_configuration
   machine_configuration_input = data.talos_machine_configuration.worker[each.key].machine_configuration

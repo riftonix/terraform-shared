@@ -41,13 +41,17 @@ No modules.
 | <a name="input_cluster_name"></a> [cluster\_name](#input\_cluster\_name) | Talos/Kubernetes cluster name. | `string` | n/a | yes |
 | <a name="input_control_plane_allow_schedule"></a> [control\_plane\_allow\_schedule](#input\_control\_plane\_allow\_schedule) | Allow workload scheduling on control-plane nodes. | `bool` | `false` | no |
 | <a name="input_control_plane_config_patches"></a> [control\_plane\_config\_patches](#input\_control\_plane\_config\_patches) | Extra config patches applied to all control-plane nodes. | `list(string)` | `[]` | no |
-| <a name="input_control_plane_nodes"></a> [control\_plane\_nodes](#input\_control\_plane\_nodes) | Existing Talos control-plane nodes. | <pre>list(object({<br/>    name         = string<br/>    node         = string<br/>    endpoint     = optional(string)<br/>    install_disk = optional(string)<br/>    labels       = optional(map(string), {})<br/>    taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/>    config_patches = optional(list(string), [])<br/>  }))</pre> | n/a | yes |
+| <a name="input_control_plane_defaults"></a> [control\_plane\_defaults](#input\_control\_plane\_defaults) | Defaults applied to nodes from control_plane_nodes_map. | <pre>object({<br/>    install_disk   = optional(string)<br/>    labels         = optional(map(string), {})<br/>    taints         = optional(list(object({ key = string, value = string, effect = string })), [])<br/>    config_patches = optional(list(string), [])<br/>  })</pre> | <pre>{<br/>  "config_patches": [],<br/>  "install_disk": null,<br/>  "labels": {},<br/>  "taints": []<br/>}</pre> | no |
+| <a name="input_control_plane_nodes_map"></a> [control\_plane\_nodes\_map](#input\_control\_plane\_nodes\_map) | Control-plane nodes as map keyed by node name. Works with any infra module output that follows this schema. | <pre>map(object({<br/>    name     = string<br/>    node     = string<br/>    endpoint = optional(string)<br/>    install_disk = optional(string)<br/>    labels       = optional(map(string), {})<br/>    taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/>    config_patches = optional(list(string), [])<br/>  }))</pre> | n/a | yes |
 | <a name="input_kubeconfig_server_host"></a> [kubeconfig\_server\_host](#input\_kubeconfig\_server\_host) | Host to write into kubeconfig server URL. If null, cluster_endpoint_host is used. | `string` | `null` | no |
 | <a name="input_kubernetes_version"></a> [kubernetes\_version](#input\_kubernetes\_version) | Kubernetes version embedded into Talos machine configuration. | `string` | n/a | yes |
 | <a name="input_talos_version"></a> [talos\_version](#input\_talos\_version) | Talos version used for generated machine configuration features. | `string` | n/a | yes |
 | <a name="input_talosconfig_endpoints"></a> [talosconfig\_endpoints](#input\_talosconfig\_endpoints) | Talos API endpoints list to be written into talosconfig. If empty, all control-plane endpoints are used. | `list(string)` | `[]` | no |
+| <a name="input_rollout_control_plane_names"></a> [rollout\_control\_plane\_names](#input\_rollout\_control\_plane\_names) | Control-plane rollout filter: null = all nodes, [] = no nodes, [names...] = selected nodes only. | `list(string)` | `null` | no |
+| <a name="input_rollout_worker_names"></a> [rollout\_worker\_names](#input\_rollout\_worker\_names) | Worker rollout filter: null = all nodes, [] = no nodes, [names...] = selected nodes only. | `list(string)` | `null` | no |
 | <a name="input_worker_config_patches"></a> [worker\_config\_patches](#input\_worker\_config\_patches) | Extra config patches applied to all worker nodes. | `list(string)` | `[]` | no |
-| <a name="input_worker_nodes"></a> [worker\_nodes](#input\_worker\_nodes) | Existing Talos worker nodes. | <pre>list(object({<br/>    name         = string<br/>    node         = string<br/>    endpoint     = optional(string)<br/>    install_disk = optional(string)<br/>    labels       = optional(map(string), {})<br/>    taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/>    config_patches = optional(list(string), [])<br/>  }))</pre> | `[]` | no |
+| <a name="input_worker_defaults"></a> [worker\_defaults](#input\_worker\_defaults) | Defaults applied to nodes from worker_node_maps. | <pre>object({<br/>    install_disk   = optional(string)<br/>    labels         = optional(map(string), {})<br/>    taints         = optional(list(object({ key = string, value = string, effect = string })), [])<br/>    config_patches = optional(list(string), [])<br/>  })</pre> | <pre>{<br/>  "config_patches": [],<br/>  "install_disk": null,<br/>  "labels": {},<br/>  "taints": []<br/>}</pre> | no |
+| <a name="input_worker_node_maps"></a> [worker\_node\_maps](#input\_worker\_node\_maps) | Worker nodes as list of maps keyed by node name (e.g., from one or many infra modules). | <pre>list(map(object({<br/>    name     = string<br/>    node     = string<br/>    endpoint = optional(string)<br/>    install_disk = optional(string)<br/>    labels       = optional(map(string), {})<br/>    taints = optional(list(object({<br/>      key    = string<br/>      value  = string<br/>      effect = string<br/>    })), [])<br/>    config_patches = optional(list(string), [])<br/>  })))</pre> | `[]` | no |
 
 ## Outputs
 
@@ -63,15 +67,15 @@ No modules.
 | <a name="output_worker_machine_configurations"></a> [worker\_machine\_configurations](#output\_worker\_machine\_configurations) | Generated machine configurations for worker nodes. |
 <!-- END_TF_DOCS -->
 
-## Как применять patches (аналогично terraform-hcloud-talos-main)
+## How to apply patches (similar to terraform-hcloud-talos-main)
 
-Патчи передаются как YAML-строки в переменные:
+Patches are passed as YAML strings via variables:
 
-- `control_plane_config_patches` — общие патчи для всех control-plane
-- `worker_config_patches` — общие патчи для всех worker
-- `control_plane_nodes[*].config_patches` / `worker_nodes[*].config_patches` — патчи только для конкретной ноды
+- `control_plane_config_patches` — shared patches for all control-plane nodes
+- `worker_config_patches` — shared patches for all worker nodes
+- `control_plane_nodes_map["name"].config_patches` / `worker_node_maps[*]["name"].config_patches` — per-node patches
 
-Пример:
+Example:
 
 ```hcl
 module "k8s_talos" {
@@ -83,8 +87,8 @@ module "k8s_talos" {
 
   cluster_endpoint_host = var.cluster_endpoint_host
 
-  control_plane_nodes = var.control_plane_nodes
-  worker_nodes        = var.worker_nodes
+  control_plane_nodes_map = var.control_plane_nodes_map
+  worker_node_maps        = var.worker_node_maps
 
   control_plane_config_patches = [
     file("${path.module}/patches/kubelet/control-plane.yaml"),
@@ -98,9 +102,78 @@ module "k8s_talos" {
 }
 ```
 
-Готовый рабочий пример с patch-файлами добавлен в `examples/base`:
+A complete working example with patch files is available in `examples/base`:
 
 - `examples/base/main.tf`
 - `examples/base/patches/registries.yaml`
 - `examples/base/patches/kubelet/control-plane.yaml`
 - `examples/base/patches/kubelet/worker.yaml`
+
+## Node input format (map-only)
+
+This module accepts nodes **only** in map format:
+
+- `control_plane_nodes_map`
+- `worker_node_maps`
+
+This is provider-agnostic: any infrastructure module (OpenStack, VMware, etc.) can be used as long as its outputs match the schema.
+
+Example (one control-plane module and multiple worker modules):
+
+```hcl
+module "k8s_talos" {
+  source = "../../modules/k8s-talos"
+
+  cluster_name       = var.cluster_name
+  talos_version      = var.talos_version
+  kubernetes_version = var.kubernetes_version
+
+  control_plane_nodes_map = module.control_plane.nodes
+  worker_node_maps = [
+    module.common_workers.nodes,
+    module.gpu_workers.nodes,
+    module.extra_workers.nodes,
+  ]
+}
+```
+
+If you need shared defaults for map-based inputs (for example `install_disk`, labels, taints, per-node patches), use:
+
+- `control_plane_defaults`
+- `worker_defaults`
+
+## Rolling upgrade (sequential)
+
+Recommended safe order for an HA Talos cluster:
+
+1. Upgrade control-plane nodes one by one.
+2. Upgrade worker nodes one by one.
+
+Why: the control plane must preserve etcd quorum and API availability before moving compute nodes.
+
+Practical Terraform flow:
+
+- change image/version for a single VM in your infra module;
+- run `apply` (optionally with `-target` for that VM);
+- wait until the node is healthy/Ready;
+- continue with the next node.
+
+For staged config application use `apply_mode = "staged_if_needing_reboot"` (or `"staged"`).
+
+For strict wave-based config rollout inside this module use:
+
+- `rollout_control_plane_names = ["dc1-k8s-pi-m-01"]`
+- `rollout_worker_names = ["dc1-k8s-pi-n-01"]`
+
+These variables scope `talos_machine_configuration_apply` to specific nodes for the current apply.
+
+Rollout filter semantics:
+
+- `null` — apply to all nodes of the role;
+- `[]` — apply to no nodes of the role;
+- `["name-1", "name-2"]` — apply only to the listed nodes.
+
+When upgrading Kubernetes via `kubernetes_version` in this module:
+
+- apply control-plane changes first (one by one);
+- then apply worker changes (one by one).

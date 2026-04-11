@@ -18,13 +18,13 @@ module "k8s_talos_single_node" {
 
   control_plane_allow_schedule = true
 
-  control_plane_nodes = [
-    {
+  control_plane_nodes_map = {
+    "cp-1" = {
       name     = "cp-1"
       node     = var.control_plane_node_ip
       endpoint = var.control_plane_node_ip
     }
-  ]
+  }
 }
 
 output "cluster_endpoint" {

@@ -27,9 +27,9 @@ variable "kubeconfig_server_host" {
   default     = null
 }
 
-variable "control_plane_nodes" {
-  description = "Existing control-plane Talos nodes."
-  type = list(object({
+variable "control_plane_nodes_map" {
+  description = "Existing control-plane Talos nodes keyed by node name."
+  type = map(object({
     name         = string
     node         = string
     endpoint     = optional(string)
@@ -44,9 +44,9 @@ variable "control_plane_nodes" {
   }))
 }
 
-variable "worker_nodes" {
-  description = "Existing worker Talos nodes."
-  type = list(object({
+variable "worker_node_maps" {
+  description = "Existing worker Talos nodes as a list of maps keyed by node name."
+  type = list(map(object({
     name         = string
     node         = string
     endpoint     = optional(string)
@@ -58,7 +58,6 @@ variable "worker_nodes" {
       effect = string
     })), [])
     config_patches = optional(list(string), [])
-  }))
+  })))
   default = []
 }
-

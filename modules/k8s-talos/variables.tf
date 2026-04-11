@@ -25,12 +25,12 @@ variable "cluster_endpoint_port" {
   default     = 6443
 }
 
-variable "control_plane_nodes" {
-  description = "Existing Talos control-plane nodes."
-  type = list(object({
-    name         = string
-    node         = string
-    endpoint     = optional(string)
+variable "control_plane_nodes_map" {
+  description = "Control-plane nodes as map keyed by node name. Works with any infra module output that follows this schema."
+  type = map(object({
+    name     = string
+    node     = string
+    endpoint = optional(string)
     install_disk = optional(string)
     labels       = optional(map(string), {})
     taints = optional(list(object({
@@ -42,26 +42,51 @@ variable "control_plane_nodes" {
   }))
 
   validation {
-    condition     = length(var.control_plane_nodes) > 0
-    error_message = "At least one control plane node is required."
+    condition     = length(var.control_plane_nodes_map) > 0
+    error_message = "At least one control-plane node is required in control_plane_nodes_map."
   }
 
   validation {
     condition = alltrue([
       for taint in flatten([
-        for node in var.control_plane_nodes : node.taints
+        for _, node in var.control_plane_nodes_map : node.taints
       ]) : contains(["NoSchedule", "PreferNoSchedule", "NoExecute"], taint.effect)
     ])
-    error_message = "Invalid taint effect in control_plane_nodes. Allowed: NoSchedule, PreferNoSchedule, NoExecute."
+    error_message = "Invalid taint effect in control_plane_nodes_map. Allowed: NoSchedule, PreferNoSchedule, NoExecute."
   }
 }
 
-variable "worker_nodes" {
-  description = "Existing Talos worker nodes."
-  type = list(object({
-    name         = string
-    node         = string
-    endpoint     = optional(string)
+variable "control_plane_defaults" {
+  description = "Defaults applied to nodes from control_plane_nodes_map."
+  type = object({
+    install_disk   = optional(string)
+    labels         = optional(map(string), {})
+    taints         = optional(list(object({ key = string, value = string, effect = string })), [])
+    config_patches = optional(list(string), [])
+  })
+  default = {
+    install_disk   = null
+    labels         = {}
+    taints         = []
+    config_patches = []
+  }
+
+  validation {
+    condition = alltrue([
+      for taint in flatten([
+        var.control_plane_defaults.taints
+      ]) : contains(["NoSchedule", "PreferNoSchedule", "NoExecute"], taint.effect)
+    ])
+    error_message = "Invalid taint effect in control_plane_defaults.taints. Allowed: NoSchedule, PreferNoSchedule, NoExecute."
+  }
+}
+
+variable "worker_node_maps" {
+  description = "Worker nodes as list of maps keyed by node name (e.g., from one or many infra modules)."
+  type = list(map(object({
+    name     = string
+    node     = string
+    endpoint = optional(string)
     install_disk = optional(string)
     labels       = optional(map(string), {})
     taints = optional(list(object({
@@ -70,16 +95,43 @@ variable "worker_nodes" {
       effect = string
     })), [])
     config_patches = optional(list(string), [])
-  }))
+  })))
   default = []
 
   validation {
     condition = alltrue([
+      for taint in flatten(flatten([
+        for worker_map in var.worker_node_maps : [
+          for _, node in worker_map : node.taints
+        ]
+      ])) : contains(["NoSchedule", "PreferNoSchedule", "NoExecute"], taint.effect)
+    ])
+    error_message = "Invalid taint effect in worker_node_maps. Allowed: NoSchedule, PreferNoSchedule, NoExecute."
+  }
+}
+
+variable "worker_defaults" {
+  description = "Defaults applied to nodes from worker_node_maps."
+  type = object({
+    install_disk   = optional(string)
+    labels         = optional(map(string), {})
+    taints         = optional(list(object({ key = string, value = string, effect = string })), [])
+    config_patches = optional(list(string), [])
+  })
+  default = {
+    install_disk   = null
+    labels         = {}
+    taints         = []
+    config_patches = []
+  }
+
+  validation {
+    condition = alltrue([
       for taint in flatten([
-        for node in var.worker_nodes : node.taints
+        var.worker_defaults.taints
       ]) : contains(["NoSchedule", "PreferNoSchedule", "NoExecute"], taint.effect)
     ])
-    error_message = "Invalid taint effect in worker_nodes. Allowed: NoSchedule, PreferNoSchedule, NoExecute."
+    error_message = "Invalid taint effect in worker_defaults.taints. Allowed: NoSchedule, PreferNoSchedule, NoExecute."
   }
 }
 
@@ -151,4 +203,18 @@ variable "worker_config_patches" {
   description = "Extra config patches applied to all worker nodes."
   type        = list(string)
   default     = []
+}
+
+variable "rollout_control_plane_names" {
+  description = "Control-plane rollout filter: null = all nodes, [] = no nodes, [names...] = selected nodes only."
+  type        = list(string)
+  default     = null
+  nullable    = true
+}
+
+variable "rollout_worker_names" {
+  description = "Worker rollout filter: null = all nodes, [] = no nodes, [names...] = selected nodes only."
+  type        = list(string)
+  default     = null
+  nullable    = true
 }
