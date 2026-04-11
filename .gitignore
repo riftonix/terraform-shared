@@ -42,5 +42,4 @@ terraform.rc
 .env
 
 # Tmp
-modules/vsphere-virtual-machine
 sources/
