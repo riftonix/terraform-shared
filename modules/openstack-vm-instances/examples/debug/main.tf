@@ -178,3 +178,34 @@ output "selected_security_group_kz1" {
     all_tags = data.openstack_networking_secgroup_v2.selected_kz1[0].all_tags
   } : null
 }
+
+# Example snippet for `../../` module usage with:
+# - global/per-node network resolution (`network_id` + `network_name`)
+# - global/per-node public IP control (`create_public_ip`)
+#
+# module "vm_instances" {
+#   source = "../../"
+#
+#   providers = {
+#     openstack = openstack.ru2
+#   }
+#
+#   image_name       = "routeros-7.20.8"
+#   flavor_name      = "SL1.1-2048-20"
+#   network_id       = "<private-network-id>"
+#   create_public_ip = false
+#   public_ip_pool   = "public"
+#
+#   nodes = {
+#     router-1 = {
+#       fixed_ip_v4      = "10.0.0.10"
+#       create_public_ip = true
+#     }
+#
+#     router-2 = {
+#       network_name     = "private-alt"
+#       fixed_ip_v4      = "10.0.1.10"
+#       create_public_ip = false
+#     }
+#   }
+# }

@@ -36,7 +36,7 @@ variable "network_dns_domain" {
 variable "network_tags" {
   description = "Default tags applied to the network."
   type        = list(string)
-  default     = []
+  default     = null
 }
 
 variable "network_value_specs" {

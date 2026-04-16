@@ -37,9 +37,28 @@ variable "network_name" {
   default     = null
 }
 
+variable "network_id" {
+  description = "Default OpenStack network ID where NICs will be attached. If null, network_name can be used globally/per node."
+  type        = string
+  default     = null
+}
+
+variable "create_public_ip" {
+  description = "Whether to allocate and attach a public floating IP for all nodes by default (can be overridden per node)."
+  type        = bool
+  default     = false
+}
+
+variable "public_ip_pool" {
+  description = "OpenStack external network pool name used to allocate floating IPs."
+  type        = string
+  default     = "external-network"
+}
+
 variable "nodes" {
   description = "Instances map keyed by node name."
   type = map(object({
+    network_id          = optional(string)
     network_name        = optional(string)
     root_volume_size_gb = optional(number)
     root_volume_type    = optional(string)
@@ -49,6 +68,7 @@ variable "nodes" {
     tags                = optional(list(string), [])
     security_groups     = optional(list(string))
     availability_zone   = optional(string)
+    create_public_ip    = optional(bool)
   }))
 
   validation {
@@ -57,10 +77,12 @@ variable "nodes" {
   }
 
   validation {
-    condition = var.network_name != null || alltrue([
-      for _, node in var.nodes : try(node.network_name, null) != null
+    condition = alltrue([
+      for _, node in var.nodes : !(
+        try(node.network_id, null) != null && try(node.network_name, null) != null
+      )
     ])
-    error_message = "If `network_name` is not set, every node in `nodes` must define `network_name`."
+    error_message = "`network_id` and `network_name` are mutually exclusive for each node in `nodes`."
   }
 }
 

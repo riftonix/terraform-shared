@@ -34,3 +34,7 @@ output "subnets" {
   }
 }
 
+output "input_subnets" {
+  description = "Raw subnets structure passed to the module input."
+  value       = var.subnets
+}
