@@ -99,7 +99,7 @@ module "instance_example" {
   network_id          = module.network_example.network.id
   create_public_ip    = true
   flavor_name         = "PRC10.1-512"
-  security_groups     = ["default"]
+  # security_groups     = ["default"]
 
   nodes = {
     example = {}

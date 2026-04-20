@@ -8,7 +8,7 @@ output "network" {
     port_security_enabled = openstack_networking_network_v2.this.port_security_enabled
     mtu                   = openstack_networking_network_v2.this.mtu
     dns_domain            = openstack_networking_network_v2.this.dns_domain
-    tags                  = openstack_networking_network_v2.this.tags
+    tags                  = coalesce(openstack_networking_network_v2.this.tags, [])
   }
 }
 
@@ -28,7 +28,7 @@ output "subnets" {
       service_types        = subnet.service_types
       segment_id           = subnet.segment_id
       subnetpool_id        = subnet.subnetpool_id
-      tags                 = subnet.tags
+      tags                 = coalesce(subnet.tags, [])
       allocation_pool      = subnet.allocation_pool
     }
   }

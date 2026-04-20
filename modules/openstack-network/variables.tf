@@ -36,7 +36,13 @@ variable "network_dns_domain" {
 variable "network_tags" {
   description = "Default tags applied to the network."
   type        = list(string)
-  default     = null
+  default     = []
+  nullable    = false
+
+  validation {
+    condition     = var.network_tags != null
+    error_message = "`network_tags` cannot be null. Use [] for no tags."
+  }
 }
 
 variable "network_value_specs" {
@@ -48,20 +54,20 @@ variable "network_value_specs" {
 variable "subnets" {
   description = "Subnets map keyed by subnet name."
   type = map(object({
-    description         = optional(string)
-    cidr                = optional(string)
-    subnetpool_id       = optional(string)
-    prefix_length       = optional(number)
-    ip_version          = optional(number, 4)
-    gateway_ip          = optional(string)
-    no_gateway          = optional(bool, false)
-    enable_dhcp         = optional(bool, true)
-    dns_nameservers     = optional(list(string), [])
+    description          = optional(string)
+    cidr                 = optional(string)
+    subnetpool_id        = optional(string)
+    prefix_length        = optional(number)
+    ip_version           = optional(number, 4)
+    gateway_ip           = optional(string)
+    no_gateway           = optional(bool, false)
+    enable_dhcp          = optional(bool, true)
+    dns_nameservers      = optional(list(string), [])
     dns_publish_fixed_ip = optional(bool, false)
-    service_types       = optional(list(string), [])
-    segment_id          = optional(string)
-    tags                = optional(list(string), [])
-    value_specs         = optional(map(string), {})
+    service_types        = optional(list(string), [])
+    segment_id           = optional(string)
+    tags                 = optional(list(string), [])
+    value_specs          = optional(map(string), {})
     allocation_pools = optional(list(object({
       start = string
       end   = string
@@ -99,5 +105,11 @@ variable "subnets" {
     ])
     error_message = "`no_gateway = true` cannot be used together with `gateway_ip`."
   }
-}
 
+  validation {
+    condition = alltrue([
+      for _, subnet in var.subnets : try(subnet.tags, []) != null
+    ])
+    error_message = "`subnets[*].tags` cannot be null. Use [] for no tags."
+  }
+}

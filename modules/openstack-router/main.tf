@@ -44,7 +44,7 @@ resource "openstack_networking_router_v2" "this" {
   admin_state_up      = var.router_admin_state_up
   external_network_id = local.effective_external_network_id
   enable_snat         = var.router_enable_snat
-  tags                = var.router_tags
+  tags                = coalesce(var.router_tags, [])
 
   lifecycle {
     precondition {

@@ -34,9 +34,10 @@ variable "router_enable_snat" {
 }
 
 variable "router_tags" {
-  description = "Tags applied to the router."
+  description = "Tags applied to the router. Null values are not allowed to prevent null/[] drift."
   type        = list(string)
   default     = []
+  nullable    = false
 }
 
 variable "subnet_ids" {

@@ -5,7 +5,7 @@ output "router" {
     name                = openstack_networking_router_v2.this.name
     external_network_id = openstack_networking_router_v2.this.external_network_id
     enable_snat         = openstack_networking_router_v2.this.enable_snat
-    tags                = openstack_networking_router_v2.this.tags
+    tags                = coalesce(openstack_networking_router_v2.this.tags, [])
   }
 }
 
