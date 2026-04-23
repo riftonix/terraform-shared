@@ -25,6 +25,100 @@ variable "root_volume_type" {
   }
 }
 
+variable "data_volumes" {
+  description = "Default data volumes for all nodes. Node-level data_volumes override this map entirely when set."
+  type = map(object({
+    size_gb           = number
+    unit_number       = optional(number)
+    volume_type       = optional(string)
+    datastore_name    = optional(string)
+    storage_policy_id = optional(string)
+    disk_mode         = optional(string, "persistent")
+    disk_sharing      = optional(string, "sharingNone")
+    io_limit          = optional(number, -1)
+    io_reservation    = optional(number, 0)
+    io_share_level    = optional(string, "normal")
+    io_share_count    = optional(number, 0)
+    keep_on_remove    = optional(bool, false)
+    controller_type   = optional(string, "scsi")
+    write_through     = optional(bool, false)
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for _, volume in var.data_volumes : volume.size_gb > 0
+    ])
+    error_message = "`data_volumes[*].size_gb` must be greater than 0."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, volume in var.data_volumes : try(volume.unit_number, null) == null || volume.unit_number > 0
+    ])
+    error_message = "`data_volumes[*].unit_number` must be greater than 0 because unit_number 0 is reserved for the root disk."
+  }
+
+  validation {
+    condition = length(distinct([
+      for volume_name, volume in var.data_volumes : coalesce(
+        try(volume.unit_number, null),
+        index(sort(keys(var.data_volumes)), volume_name) + 1
+      )
+    ])) == length(var.data_volumes)
+    error_message = "`data_volumes[*].unit_number` values must be unique, including automatically assigned unit numbers."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, volume in var.data_volumes : try(volume.volume_type, null) == null || contains(["thin", "thick", "eagerZeroedThick"], volume.volume_type)
+    ])
+    error_message = "`data_volumes[*].volume_type` must be one of: thin, thick, eagerZeroedThick."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, volume in var.data_volumes : contains([
+        "append",
+        "independent_nonpersistent",
+        "independent_persistent",
+        "nonpersistent",
+        "persistent",
+        "undoable",
+      ], volume.disk_mode)
+    ])
+    error_message = "`data_volumes[*].disk_mode` must be one of: append, independent_nonpersistent, independent_persistent, nonpersistent, persistent, undoable."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, volume in var.data_volumes : contains(["sharingMultiWriter", "sharingNone"], volume.disk_sharing)
+    ])
+    error_message = "`data_volumes[*].disk_sharing` must be one of: sharingMultiWriter, sharingNone."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, volume in var.data_volumes : contains(["low", "normal", "high", "custom"], volume.io_share_level)
+    ])
+    error_message = "`data_volumes[*].io_share_level` must be one of: low, normal, high, custom."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, volume in var.data_volumes : volume.io_limit >= -1 && volume.io_reservation >= 0 && volume.io_share_count >= 0
+    ])
+    error_message = "`data_volumes[*].io_limit` must be >= -1; io_reservation and io_share_count must be >= 0."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, volume in var.data_volumes : contains(["scsi", "sata", "nvme", "ide"], volume.controller_type)
+    ])
+    error_message = "`data_volumes[*].controller_type` must be one of: scsi, sata, nvme, ide."
+  }
+}
+
 variable "network_path" {
   description = "Default vSphere network path/name. If null, each node must define network_name."
   type        = string
@@ -40,19 +134,35 @@ variable "ovf_network_label" {
 variable "nodes" {
   description = "Instances map keyed by node name."
   type = map(object({
-    network_name        = optional(string)
-    datastore_name      = optional(string)
-    resource_pool_name  = optional(string)
+    network_name         = optional(string)
+    datastore_name       = optional(string)
+    resource_pool_name   = optional(string)
     compute_cluster_name = optional(string)
-    num_cpus            = optional(number)
+    num_cpus             = optional(number)
     num_cores_per_socket = optional(number)
-    memory_mb           = optional(number)
-    root_volume_size_gb = optional(number)
-    root_volume_type    = optional(string)
-    fixed_ip_v4         = optional(string)
-    user_data           = optional(string)
-    metadata            = optional(map(string), {})
-    vsphere_host        = optional(string)
+    memory_mb            = optional(number)
+    root_volume_size_gb  = optional(number)
+    root_volume_type     = optional(string)
+    fixed_ip_v4          = optional(string)
+    user_data            = optional(string)
+    metadata             = optional(map(string), {})
+    vsphere_host         = optional(string)
+    data_volumes = optional(map(object({
+      size_gb           = number
+      unit_number       = optional(number)
+      volume_type       = optional(string)
+      datastore_name    = optional(string)
+      storage_policy_id = optional(string)
+      disk_mode         = optional(string, "persistent")
+      disk_sharing      = optional(string, "sharingNone")
+      io_limit          = optional(number, -1)
+      io_reservation    = optional(number, 0)
+      io_share_level    = optional(string, "normal")
+      io_share_count    = optional(number, 0)
+      keep_on_remove    = optional(bool, false)
+      controller_type   = optional(string, "scsi")
+      write_through     = optional(bool, false)
+    })))
   }))
 
   validation {
@@ -86,6 +196,97 @@ variable "nodes" {
       for _, node in var.nodes : !(try(node.resource_pool_name, null) != null && try(node.compute_cluster_name, null) != null)
     ])
     error_message = "Each node may define only one of `resource_pool_name` or `compute_cluster_name`, not both."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for _, node in var.nodes : [
+        for _, volume in coalesce(try(node.data_volumes, null), {}) : volume.size_gb > 0
+      ]
+    ]))
+    error_message = "`nodes[*].data_volumes[*].size_gb` must be greater than 0."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for _, node in var.nodes : [
+        for _, volume in coalesce(try(node.data_volumes, null), {}) : try(volume.unit_number, null) == null || volume.unit_number > 0
+      ]
+    ]))
+    error_message = "`nodes[*].data_volumes[*].unit_number` must be greater than 0 because unit_number 0 is reserved for the root disk."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, node in var.nodes : length(distinct([
+        for volume_name, volume in coalesce(try(node.data_volumes, null), {}) : coalesce(
+          try(volume.unit_number, null),
+          index(sort(keys(coalesce(try(node.data_volumes, null), {}))), volume_name) + 1
+        )
+      ])) == length(coalesce(try(node.data_volumes, null), {}))
+    ])
+    error_message = "`nodes[*].data_volumes[*].unit_number` values must be unique per node, including automatically assigned unit numbers."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for _, node in var.nodes : [
+        for _, volume in coalesce(try(node.data_volumes, null), {}) : try(volume.volume_type, null) == null || contains(["thin", "thick", "eagerZeroedThick"], volume.volume_type)
+      ]
+    ]))
+    error_message = "`nodes[*].data_volumes[*].volume_type` must be one of: thin, thick, eagerZeroedThick."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for _, node in var.nodes : [
+        for _, volume in coalesce(try(node.data_volumes, null), {}) : contains([
+          "append",
+          "independent_nonpersistent",
+          "independent_persistent",
+          "nonpersistent",
+          "persistent",
+          "undoable",
+        ], volume.disk_mode)
+      ]
+    ]))
+    error_message = "`nodes[*].data_volumes[*].disk_mode` must be one of: append, independent_nonpersistent, independent_persistent, nonpersistent, persistent, undoable."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for _, node in var.nodes : [
+        for _, volume in coalesce(try(node.data_volumes, null), {}) : contains(["sharingMultiWriter", "sharingNone"], volume.disk_sharing)
+      ]
+    ]))
+    error_message = "`nodes[*].data_volumes[*].disk_sharing` must be one of: sharingMultiWriter, sharingNone."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for _, node in var.nodes : [
+        for _, volume in coalesce(try(node.data_volumes, null), {}) : contains(["low", "normal", "high", "custom"], volume.io_share_level)
+      ]
+    ]))
+    error_message = "`nodes[*].data_volumes[*].io_share_level` must be one of: low, normal, high, custom."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for _, node in var.nodes : [
+        for _, volume in coalesce(try(node.data_volumes, null), {}) : volume.io_limit >= -1 && volume.io_reservation >= 0 && volume.io_share_count >= 0
+      ]
+    ]))
+    error_message = "`nodes[*].data_volumes[*].io_limit` must be >= -1; io_reservation and io_share_count must be >= 0."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for _, node in var.nodes : [
+        for _, volume in coalesce(try(node.data_volumes, null), {}) : contains(["scsi", "sata", "nvme", "ide"], volume.controller_type)
+      ]
+    ]))
+    error_message = "`nodes[*].data_volumes[*].controller_type` must be one of: scsi, sata, nvme, ide."
   }
 }
 

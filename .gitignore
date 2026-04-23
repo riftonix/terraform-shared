@@ -43,3 +43,4 @@ terraform.rc
 
 # Tmp
 sources/
+modules/vsphere-vm-instances/examples/talos

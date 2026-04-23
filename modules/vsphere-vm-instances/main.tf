@@ -83,6 +83,39 @@ data "vsphere_host" "per_node" {
 }
 
 locals {
+  data_volume_raw_by_node = {
+    for name, node in var.nodes : name => coalesce(try(node.data_volumes, null), var.data_volumes)
+  }
+
+  data_volume_keys_by_node = {
+    for name, volumes in local.data_volume_raw_by_node : name => sort(keys(volumes))
+  }
+
+  data_volumes_by_node = {
+    for node_name, volumes in local.data_volume_raw_by_node : node_name => {
+      for volume_name, volume in volumes : volume_name => merge(volume, {
+        unit_number = coalesce(
+          try(volume.unit_number, null),
+          index(local.data_volume_keys_by_node[node_name], volume_name) + 1
+        )
+      })
+    }
+  }
+
+  data_volume_datastore_refs = {
+    for ref in flatten([
+      for node_name, volumes in local.data_volumes_by_node : [
+        for volume_name, volume in volumes : {
+          key            = "${node_name}/${volume_name}"
+          node_name      = node_name
+          volume_name    = volume_name
+          datastore_name = try(volume.datastore_name, null)
+        }
+        if try(volume.datastore_name, null) != null
+      ]
+    ]) : ref.key => ref
+  }
+
   root_volume_type_by_node = {
     for name, node in var.nodes : name => coalesce(try(node.root_volume_type, null), var.root_volume_type)
   }
@@ -153,6 +186,13 @@ locals {
   }
 }
 
+data "vsphere_datastore" "data_volume" {
+  for_each = local.data_volume_datastore_refs
+
+  name          = each.value.datastore_name
+  datacenter_id = data.vsphere_datacenter.this.id
+}
+
 data "vsphere_ovf_vm_template" "this" {
   for_each = var.nodes
 
@@ -191,12 +231,36 @@ resource "vsphere_virtual_machine" "this" {
   }
 
   disk {
-    label = "disk0"
-    size  = coalesce(try(each.value.root_volume_size_gb, null), var.root_volume_size_gb)
+    label          = "disk0"
+    size           = coalesce(try(each.value.root_volume_size_gb, null), var.root_volume_size_gb)
     io_share_count = var.disk_io_share_count
 
     thin_provisioned = local.root_volume_type_by_node[each.key] == "thin"
     eagerly_scrub    = local.root_volume_type_by_node[each.key] == "eagerZeroedThick"
+  }
+
+  dynamic "disk" {
+    for_each = local.data_volumes_by_node[each.key]
+
+    content {
+      label             = "disk${disk.value.unit_number}"
+      size              = disk.value.size_gb
+      unit_number       = disk.value.unit_number
+      datastore_id      = try(data.vsphere_datastore.data_volume["${each.key}/${disk.key}"].id, null)
+      storage_policy_id = try(disk.value.storage_policy_id, null)
+      disk_mode         = disk.value.disk_mode
+      disk_sharing      = disk.value.disk_sharing
+      io_limit          = disk.value.io_limit
+      io_reservation    = disk.value.io_reservation
+      io_share_level    = disk.value.io_share_level
+      io_share_count    = disk.value.io_share_count
+      keep_on_remove    = disk.value.keep_on_remove
+      controller_type   = disk.value.controller_type
+      write_through     = disk.value.write_through
+
+      thin_provisioned = coalesce(try(disk.value.volume_type, null), local.root_volume_type_by_node[each.key]) == "thin"
+      eagerly_scrub    = coalesce(try(disk.value.volume_type, null), local.root_volume_type_by_node[each.key]) == "eagerZeroedThick"
+    }
   }
 
   ovf_deploy {
