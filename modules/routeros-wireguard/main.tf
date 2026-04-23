@@ -10,14 +10,14 @@ locals {
     for peer_name, peer in local.active_site_peers :
     peer_name => coalesce(
       try(peer.allowed_addresses, null),
-      concat([peer.remote_address], coalesce(try(peer.routed_prefixes, null), peer.remote_networks))
+      ["0.0.0.0/0"]
     )
   }
 
   route_entries = {
     for entry in flatten([
       for peer_name, peer in local.active_site_peers : [
-        for route_prefix in coalesce(try(peer.routed_prefixes, null), peer.remote_networks) : {
+        for route_prefix in coalesce(try(peer.route_prefixes, null), peer.remote_networks) : {
           key         = "${peer_name}-${replace(replace(route_prefix, ".", "-"), "/", "_")}"
           comment     = coalesce(try(peer.comment, null), "WireGuard route ${peer_name}")
           dst_address = route_prefix
@@ -102,6 +102,18 @@ locals {
       ]
     ]) : entry.key => entry
   }
+
+  road_warrior_nat_excluded_prefixes = var.road_warrior == null ? [] : coalesce(
+    try(var.road_warrior.nat_excluded_prefixes, null),
+    []
+  )
+
+  road_warrior_nat_excluded_prefix_map = {
+    for prefix in local.road_warrior_nat_excluded_prefixes :
+    replace(replace(prefix, ".", "-"), "/", "_") => prefix
+  }
+
+  road_warrior_nat_exclusion_list_name = "${var.interface.name}-nat-excluded"
 }
 
 resource "routeros_interface_wireguard" "this" {
@@ -127,7 +139,7 @@ resource "routeros_interface_wireguard_peer" "site" {
   preshared_key        = try(each.value.preshared_key, null)
   endpoint_address     = try(each.value.endpoint_address, null)
   endpoint_port        = try(each.value.endpoint_port, null) == null ? null : tostring(each.value.endpoint_port)
-  persistent_keepalive = try(each.value.persistent_keepalive, null) == null ? null : tostring(each.value.persistent_keepalive)
+  persistent_keepalive = try(each.value.persistent_keepalive, null)
   allowed_address      = local.site_peer_allowed_addresses[each.key]
   is_responder         = try(each.value.responder_only, false)
   comment              = coalesce(try(each.value.comment, null), "WireGuard peer ${each.key}")
@@ -155,7 +167,7 @@ resource "routeros_interface_wireguard_peer" "road_warrior" {
   preshared_key        = local.road_warrior_preshared_keys[each.key]
   allowed_address      = [each.value.address]
   client_address       = each.value.address
-  persistent_keepalive = try(each.value.persistent_keepalive, null) == null ? null : tostring(each.value.persistent_keepalive)
+  persistent_keepalive = coalesce(try(each.value.persistent_keepalive, null), try(var.road_warrior.client_persistent_keepalive, null))
   comment              = coalesce(try(each.value.comment, null), "Road-warrior peer ${each.key}")
 }
 
@@ -174,7 +186,7 @@ data "wireguard_config_document" "road_warrior" {
       preshared_key        = local.road_warrior_preshared_keys[each.key]
       endpoint             = try(var.interface.public_endpoint_address, null) == null ? null : "${var.interface.public_endpoint_address}:${var.interface.listen_port}"
       allowed_ips          = coalesce(try(each.value.allowed_ips, null), try(var.road_warrior.client_allowed_ips, null), ["0.0.0.0/0"])
-      persistent_keepalive = try(each.value.persistent_keepalive, null)
+      persistent_keepalive = coalesce(try(each.value.persistent_keepalive, null), try(var.road_warrior.client_persistent_keepalive, null), null) == null ? null : tonumber(trimsuffix(coalesce(try(each.value.persistent_keepalive, null), try(var.road_warrior.client_persistent_keepalive, null)), "s"))
       description          = coalesce(try(each.value.comment, null), "Road-warrior peer ${each.key}")
     }
   }
@@ -236,26 +248,32 @@ resource "routeros_ip_firewall_filter" "internet_egress_forward" {
   comment     = "${each.value.comment} internet-egress"
 }
 
-resource "routeros_ip_firewall_nat" "road_warrior_nat_exclusion" {
-  for_each = var.road_warrior != null && try(var.road_warrior.create_internet_nat, false) ? {
-    for prefix in try(var.road_warrior.nat_excluded_prefixes, []) :
-    replace(replace(prefix, ".", "-"), "/", "_") => prefix
-  } : {}
+resource "routeros_ip_firewall_addr_list" "road_warrior_nat_exclusion" {
+  for_each = var.road_warrior != null && try(var.road_warrior.create_internet_nat, false) ? local.road_warrior_nat_excluded_prefix_map : {}
 
-  action      = "accept"
-  chain       = "srcnat"
-  src_address = local.interface_network
-  dst_address = each.value
-  comment     = coalesce(try(var.interface.comment, null), "Road-warrior NAT exclusion")
+  list    = local.road_warrior_nat_exclusion_list_name
+  address = each.value
+  comment = coalesce(try(var.interface.comment, null), "Road-warrior NAT exclusion")
+}
+
+resource "routeros_ip_firewall_nat" "road_warrior_nat_exclusion" {
+  count = var.road_warrior != null && try(var.road_warrior.create_internet_nat, false) && length(local.road_warrior_nat_excluded_prefixes) > 0 ? 1 : 0
+
+  action           = "accept"
+  chain            = "srcnat"
+  src_address      = local.interface_network
+  dst_address_list = local.road_warrior_nat_exclusion_list_name
+  comment          = coalesce(try(var.interface.comment, null), "Road-warrior NAT exclusion")
 }
 
 resource "routeros_ip_firewall_nat" "road_warrior_nat" {
   count = var.road_warrior != null && try(var.road_warrior.create_internet_nat, false) ? 1 : 0
 
-  action      = "masquerade"
-  chain       = "srcnat"
-  src_address = local.interface_network
-  comment     = coalesce(try(var.interface.comment, null), "Road-warrior internet egress")
+  action        = "masquerade"
+  chain         = "srcnat"
+  src_address   = local.interface_network
+  out_interface = try(var.road_warrior.internet_nat_out_interface, null)
+  comment       = coalesce(try(var.interface.comment, null), "Road-warrior internet egress")
 }
 
 resource "routeros_ip_firewall_nat" "internet_egress_nat" {

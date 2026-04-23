@@ -14,20 +14,20 @@ variable "interface" {
 variable "site_peers" {
   description = "Site-to-site peers attached to the local WireGuard interface"
   type = map(object({
-    peer_public_key                = string
-    preshared_key                  = optional(string)
-    endpoint_address               = optional(string)
-    endpoint_port                  = optional(number)
-    persistent_keepalive           = optional(number)
-    responder_only                 = optional(bool)
-    remote_address                 = string
-    remote_networks                = list(string)
-    routed_prefixes                = optional(list(string))
-    local_networks                 = list(string)
-    allowed_addresses              = optional(list(string))
+    peer_public_key                 = string
+    preshared_key                   = optional(string)
+    endpoint_address                = optional(string)
+    endpoint_port                   = optional(number)
+    persistent_keepalive            = optional(string)
+    responder_only                  = optional(bool)
+    remote_address                  = string
+    remote_networks                 = list(string)
+    route_prefixes                  = optional(list(string))
+    local_networks                  = list(string)
+    allowed_addresses               = optional(list(string))
     internet_egress_source_networks = optional(list(string))
-    comment                        = optional(string)
-    enabled                        = optional(bool)
+    comment                         = optional(string)
+    enabled                         = optional(bool)
   }))
   default = {}
 }
@@ -43,13 +43,15 @@ variable "road_warrior" {
       preshared_key        = optional(string)
       allowed_ips          = optional(list(string))
       dns                  = optional(list(string))
-      persistent_keepalive = optional(number)
+      persistent_keepalive = optional(string)
       enabled              = optional(bool)
     })), {})
-    client_allowed_ips  = optional(list(string))
-    client_dns          = optional(list(string))
-    create_internet_nat = optional(bool)
-    nat_excluded_prefixes = optional(list(string))
+    client_allowed_ips          = optional(list(string))
+    client_dns                  = optional(list(string))
+    client_persistent_keepalive = optional(string)
+    create_internet_nat         = optional(bool)
+    internet_nat_out_interface  = optional(string)
+    nat_excluded_prefixes       = optional(list(string))
   })
   default = null
 }
