@@ -29,6 +29,52 @@ variable "allowed_inputs" {
   }
 }
 
+variable "allowed_forwards" {
+  description = "Forward chain allow rules. Rules are created before drop_forwards."
+  type = map(object({
+    protocol         = optional(string)
+    dst_port         = optional(string)
+    in_interface     = optional(string)
+    out_interface    = optional(string)
+    src_address      = optional(string)
+    dst_address      = optional(string)
+    src_address_list = optional(string)
+    dst_address_list = optional(string)
+    comment          = optional(string)
+  }))
+  default = {}
+}
+
+variable "drop_forwards" {
+  description = "Forward chain drop rules created after allowed_forwards."
+  type = map(object({
+    protocol         = optional(string)
+    dst_port         = optional(string)
+    in_interface     = optional(string)
+    out_interface    = optional(string)
+    src_address      = optional(string)
+    dst_address      = optional(string)
+    src_address_list = optional(string)
+    dst_address_list = optional(string)
+    comment          = optional(string)
+  }))
+  default = {}
+}
+
+variable "srcnats" {
+  description = "Source NAT rules."
+  type = map(object({
+    action           = optional(string, "masquerade")
+    out_interface    = optional(string)
+    src_address      = optional(string)
+    dst_address      = optional(string)
+    src_address_list = optional(string)
+    dst_address_list = optional(string)
+    comment          = optional(string)
+  }))
+  default = {}
+}
+
 variable "drop_other_input" {
   description = "Whether to append a final drop rule for the input chain"
   type        = bool

@@ -29,6 +29,16 @@ locals {
     }
   }
 
+  source_allowed_egresses = {
+    for source_name, source in var.sources :
+    source_name => coalesce(try(source.allowed_egress, null), toset(keys(var.egresses)))
+  }
+
+  source_src_addresses = {
+    for source_name, source in var.sources :
+    source_name => try(trimsuffix(source.src_address, "/32"), null)
+  }
+
   dns_name_rules = {
     for entry in flatten([
       for egress_name, egress in var.egresses : [
@@ -37,6 +47,7 @@ locals {
           egress_name  = egress_name
           name         = name
           address_list = local.destination_address_lists[egress_name]
+          forward_to   = length(coalesce(try(egress.dns_forward_to, null), [])) > 0 ? egress.dns_forward_to[0] : var.dns_forward_to[0]
           comment      = coalesce(try(egress.comment, null), "Egress ${egress_name}")
         }
         if local.egress_has_address_list_policy[egress_name]
@@ -81,7 +92,7 @@ locals {
           key          = "${source_name}-${index}"
           source_name  = source_name
           in_interface = try(source.in_interface, null)
-          src_address  = try(source.src_address, null)
+          src_address  = local.source_src_addresses[source_name]
           dst_address  = prefix
         }
       ]
@@ -96,11 +107,11 @@ locals {
           source_name      = source_name
           egress_name      = egress_name
           in_interface     = try(source.in_interface, null)
-          src_address      = try(source.src_address, null)
+          src_address      = local.source_src_addresses[source_name]
           dst_address_list = local.destination_address_lists[egress_name]
           comment          = coalesce(try(egress.comment, null), "Egress ${egress_name}")
         }
-        if egress.routing_table == "main" && local.egress_has_address_list_policy[egress_name]
+        if egress.routing_table == "main" && local.egress_has_address_list_policy[egress_name] && contains(local.source_allowed_egresses[source_name], egress_name)
       ]
     ]) : entry.key => entry
   }
@@ -113,11 +124,11 @@ locals {
           source_name      = source_name
           egress_name      = egress_name
           in_interface     = try(source.in_interface, null)
-          src_address      = try(source.src_address, null)
+          src_address      = local.source_src_addresses[source_name]
           dst_address_list = local.destination_address_lists[egress_name]
           comment          = coalesce(try(egress.comment, null), "Egress ${egress_name}")
         }
-        if local.egress_has_address_list_policy[egress_name]
+        if local.egress_has_address_list_policy[egress_name] && contains(local.source_allowed_egresses[source_name], egress_name)
       ]
     ]) : entry.key => entry
   }
@@ -126,10 +137,10 @@ locals {
     for source_name, source in var.sources : source_name => {
       egress_name  = var.default_egress
       in_interface = try(source.in_interface, null)
-      src_address  = try(source.src_address, null)
+      src_address  = local.source_src_addresses[source_name]
       comment      = coalesce(try(var.egresses[var.default_egress].comment, null), "Default egress ${var.default_egress}")
     }
-    if var.egresses[var.default_egress].routing_table != "main"
+    if var.egresses[var.default_egress].routing_table != "main" && contains(local.source_allowed_egresses[source_name], var.default_egress)
   }
 
   routing_marks = {
@@ -139,9 +150,10 @@ locals {
           key          = "${source_name}-${egress_name}"
           egress_name  = egress_name
           in_interface = try(source.in_interface, null)
-          src_address  = try(source.src_address, null)
+          src_address  = local.source_src_addresses[source_name]
           comment      = coalesce(try(egress.comment, null), "Egress ${egress_name}")
         }
+        if contains(local.source_allowed_egresses[source_name], egress_name)
       ]
     ]) : entry.key => entry
   }
@@ -153,7 +165,7 @@ resource "routeros_ip_dns_record" "egress_name" {
   name            = each.value.name
   match_subdomain = true
   type            = "FWD"
-  forward_to      = var.dns_forward_to
+  forward_to      = each.value.forward_to
   address_list    = each.value.address_list
   disabled        = false
   comment         = "${each.value.comment} DNS address-list"

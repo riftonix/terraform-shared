@@ -1,8 +1,9 @@
 variable "sources" {
   description = "Traffic sources governed by this egress policy"
   type = map(object({
-    in_interface = optional(string)
-    src_address  = optional(string)
+    in_interface   = optional(string)
+    src_address    = optional(string)
+    allowed_egress = optional(set(string))
   }))
 
   validation {
@@ -22,6 +23,7 @@ variable "egresses" {
     destination_prefixes        = optional(list(string), [])
     static_destination_prefixes = optional(list(string), [])
     dns_names                   = optional(list(string), [])
+    dns_forward_to              = optional(list(string), [])
     connection_mark             = optional(string)
     routing_mark                = optional(string)
     comment                     = optional(string)
@@ -67,7 +69,12 @@ variable "chain" {
 }
 
 variable "dns_forward_to" {
-  description = "DNS server used by FWD records that populate address lists"
-  type        = string
-  default     = "1.1.1.1"
+  description = "Default DNS servers used by FWD records that populate address lists"
+  type        = list(string)
+  default     = ["1.1.1.1"]
+
+  validation {
+    condition     = length(var.dns_forward_to) > 0
+    error_message = "dns_forward_to must contain at least one DNS server."
+  }
 }
