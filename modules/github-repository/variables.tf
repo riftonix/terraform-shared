@@ -122,3 +122,35 @@ variable "template" {
   })
   default = null
 }
+
+variable "protected_branches" {
+  description = "Protected branches map: key is branch name or pattern, value is branch protection settings"
+  type = map(object({
+    enforce_admins                  = optional(bool, true)
+    allows_deletions                = optional(bool, false)
+    allows_force_pushes             = optional(bool, false)
+    force_push_bypassers            = optional(set(string), [])
+    lock_branch                     = optional(bool, false)
+    require_conversation_resolution = optional(bool, false)
+    require_signed_commits          = optional(bool, false)
+    required_linear_history         = optional(bool, false)
+    required_status_checks = optional(object({
+      contexts = optional(set(string), [])
+      strict   = optional(bool, true)
+    }), null)
+    required_pull_request_reviews = optional(object({
+      dismiss_stale_reviews           = optional(bool, true)
+      dismissal_restrictions          = optional(set(string), [])
+      pull_request_bypassers          = optional(set(string), [])
+      require_code_owner_reviews      = optional(bool, false)
+      require_last_push_approval      = optional(bool, false)
+      required_approving_review_count = optional(number, 1)
+      restrict_dismissals             = optional(bool, false)
+    }), null)
+    restrict_pushes = optional(object({
+      blocks_creations = optional(bool, false)
+      push_allowances  = optional(set(string), [])
+    }), null)
+  }))
+  default = {}
+}
