@@ -81,6 +81,12 @@ variable "allow_auto_merge" {
   default     = false
 }
 
+variable "delete_branch_on_merge" {
+  description = "Automatically delete head branch after a pull request is merged"
+  type        = bool
+  default     = false
+}
+
 variable "topics" {
   description = "List of topics for the repository"
   type        = list(string)

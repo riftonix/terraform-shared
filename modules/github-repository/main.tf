@@ -13,6 +13,8 @@ resource "github_repository" "this" {
   allow_rebase_merge = var.allow_rebase_merge
   allow_auto_merge   = var.allow_auto_merge
 
+  delete_branch_on_merge = var.delete_branch_on_merge
+
   auto_init          = var.template == null ? var.auto_init : null
   gitignore_template = var.template == null ? var.gitignore_template : null
   license_template   = var.template == null ? var.license_template : null
