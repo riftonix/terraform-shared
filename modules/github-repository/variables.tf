@@ -75,6 +75,12 @@ variable "allow_rebase_merge" {
   default     = true
 }
 
+variable "allow_auto_merge" {
+  description = "Allow auto-merge for pull requests"
+  type        = bool
+  default     = false
+}
+
 variable "topics" {
   description = "List of topics for the repository"
   type        = list(string)
