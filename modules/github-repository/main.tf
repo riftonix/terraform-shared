@@ -32,18 +32,6 @@ resource "github_repository" "this" {
     }
   }
 
-  dynamic "pages" {
-    for_each = var.pages == null ? [] : [var.pages]
-    content {
-      build_type = try(pages.value.build_type, null)
-      cname      = try(pages.value.cname, null)
-      source {
-        branch = try(pages.value.branch, null)
-        path   = try(pages.value.path, null)
-      }
-    }
-  }
-
   dynamic "security_and_analysis" {
     for_each = var.security_and_analysis == null ? [] : [var.security_and_analysis]
     content {
@@ -58,6 +46,34 @@ resource "github_repository" "this" {
       }
     }
   }
+
+  lifecycle {
+    ignore_changes = [
+      pages,
+    ]
+  }
+}
+
+resource "github_repository_pages" "this" {
+  count = var.pages == null ? 0 : 1
+
+  repository     = github_repository.this.name
+  build_type     = coalesce(var.pages.build_type, "legacy")
+  cname          = var.pages.cname
+  public         = var.pages.public
+  https_enforced = var.pages.https_enforced
+
+  dynamic "source" {
+    for_each = coalesce(var.pages.build_type, "legacy") == "legacy" ? [var.pages] : []
+    content {
+      branch = coalesce(source.value.branch, var.repository_default_branch)
+      path   = coalesce(source.value.path, "/")
+    }
+  }
+
+  depends_on = [
+    github_branch_default.this,
+  ]
 }
 
 resource "github_branch" "default" {

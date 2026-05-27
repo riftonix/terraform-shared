@@ -102,12 +102,29 @@ variable "homepage_url" {
 variable "pages" {
   description = "GitHub Pages configuration"
   type = object({
-    build_type = optional(string)
-    cname      = optional(string)
-    branch     = optional(string)
-    path       = optional(string)
+    build_type     = optional(string)
+    cname          = optional(string)
+    branch         = optional(string)
+    path           = optional(string)
+    public         = optional(bool)
+    https_enforced = optional(bool)
   })
   default = null
+
+  validation {
+    condition     = var.pages == null || contains(["legacy", "workflow"], coalesce(var.pages.build_type, "legacy"))
+    error_message = "pages.build_type must be one of: legacy, workflow."
+  }
+
+  validation {
+    condition     = var.pages == null || coalesce(var.pages.build_type, "legacy") != "workflow" || (var.pages.branch == null && var.pages.path == null)
+    error_message = "pages.branch and pages.path are only supported when pages.build_type is legacy."
+  }
+
+  validation {
+    condition     = var.pages == null || var.pages.https_enforced == null || var.pages.cname != null
+    error_message = "pages.https_enforced requires pages.cname."
+  }
 }
 
 variable "security_and_analysis" {
