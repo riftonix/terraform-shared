@@ -4,7 +4,7 @@ terraform {
   required_providers {
     beget = {
       source  = "tf.beget.com/beget/beget"
-      version = "0.0.66"
+      version = "0.0.68"
     }
 
     tls = {
