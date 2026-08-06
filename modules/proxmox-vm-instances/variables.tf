@@ -525,7 +525,7 @@ variable "nodes" {
 
   validation {
     condition = alltrue([
-      for _, node in var.nodes : (try(node.memory_mb, null) == null || node.memory_mb > 0) && (try(node.balloon, null) == null || node.balloon >= 0)
+      for _, node in var.nodes : try(node.memory_mb > 0, true) && try(node.balloon >= 0, true)
     ])
     error_message = "`nodes[*].memory_mb` must be greater than 0 and `nodes[*].balloon` must be >= 0."
   }

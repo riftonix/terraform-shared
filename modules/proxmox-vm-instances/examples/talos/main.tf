@@ -16,24 +16,23 @@ provider "proxmox" {
   pm_tls_insecure = var.pm_tls_insecure
 }
 
-module "routeros" {
+module "talos" {
   source = "../.."
 
-  image_name  = "routeros-7.20.8.img"
   target_node = var.target_node
 
-  agent      = 0
-  os_type    = null
-  qemu_os    = "other"
-  bios       = "seabios"
-  scsihw     = "virtio-scsi-single"
-  boot       = "order=scsi0"
-  bootdisk   = "scsi0"
-  vm_state   = "running"
-  full_clone = true
+  agent                  = 1
+  os_type                = null
+  qemu_os                = "l26"
+  bios                   = "seabios"
+  scsihw                 = "virtio-scsi-single"
+  boot                   = "order=ide2;scsi0"
+  bootdisk               = "scsi0"
+  vm_state               = "running"
+  define_connection_info = false
 
   cpu = {
-    cores   = 2
+    cores   = 4
     sockets = 1
     type    = "host"
   }
@@ -51,11 +50,18 @@ module "routeros" {
   root_volume = {
     slot     = "scsi0"
     storage  = var.storage
-    size     = "5G"
+    size     = "20G"
     format   = "raw"
-    cache    = "none"
     discard  = true
     iothread = true
+  }
+
+  data_volumes = {
+    talos_iso = {
+      slot = "ide2"
+      type = "cdrom"
+      iso  = "ISO:iso/talos-1.13.8-nocloud-amd64.iso"
+    }
   }
 
   cloudinit = {
@@ -63,14 +69,8 @@ module "routeros" {
   }
 
   nodes = {
-    routeros-1 = {}
+    talos-control-plane-1 = {
+      vmid = 301
+    }
   }
-}
-
-output "instances" {
-  value = module.routeros.instances
-}
-
-output "nodes" {
-  value = module.routeros.nodes
 }
