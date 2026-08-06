@@ -167,8 +167,8 @@ resource "proxmox_vm_qemu" "this" {
   searchdomain  = try(local.cloudinit_by_node[each.key].searchdomain, null)
   nameserver    = try(local.cloudinit_by_node[each.key].nameserver, null)
   sshkeys       = try(local.cloudinit_by_node[each.key].sshkeys, null)
-  skip_ipv4     = try(local.cloudinit_by_node[each.key].skip_ipv4, false)
-  skip_ipv6     = try(local.cloudinit_by_node[each.key].skip_ipv6, false)
+  skip_ipv4     = try(local.cloudinit_by_node[each.key].skip_ipv4, false) ? true : null
+  skip_ipv6     = try(local.cloudinit_by_node[each.key].skip_ipv6, false) ? true : null
   agent_timeout = try(local.cloudinit_by_node[each.key].agent_timeout, 90)
 
   ipconfig0  = lookup(local.ipconfig_by_node[each.key], "0", null)
@@ -282,11 +282,11 @@ resource "proxmox_vm_qemu" "this" {
     }
 
     precondition {
-      condition = (
-        ((try(each.value.image_name, null) != null ? each.value.image_name : var.image_name) != null ? 1 : 0) +
-        ((try(each.value.image_id, null) != null ? each.value.image_id : var.image_id) != null ? 1 : 0)
-      ) == 1
-      error_message = "Each node must resolve exactly one clone source: `image_name` or `image_id`."
+      condition = !(
+        (try(each.value.image_name, null) != null ? each.value.image_name : var.image_name) != null &&
+        (try(each.value.image_id, null) != null ? each.value.image_id : var.image_id) != null
+      )
+      error_message = "Each node can resolve at most one clone source: `image_name` or `image_id`."
     }
   }
 }

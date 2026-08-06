@@ -32,18 +32,16 @@ variable "pm_tls_insecure" {
 }
 
 variable "target_node" {
-  description = "PVE node where the RouterOS VM will be created."
+  description = "PVE node where the Talos VM will be created."
   type        = string
 }
 
 variable "storage" {
   description = "Proxmox storage for the VM root disk."
   type        = string
-  default     = "local-lvm"
 }
 
 variable "network_bridge" {
   description = "Proxmox network bridge for the VM."
   type        = string
-  default     = "vmbr0"
 }
