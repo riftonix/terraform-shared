@@ -105,6 +105,15 @@ locals {
     })
   }
 
+  control_plane_hostname_patches = {
+    for name, node in local.control_plane_nodes_by_name : name => yamlencode({
+      apiVersion = "v1alpha1"
+      kind       = "HostnameConfig"
+      auto       = "off"
+      hostname   = node.name
+    })
+  }
+
   worker_base_patches = {
     for name, node in local.worker_nodes_by_name : name => yamlencode({
       machine = merge(
@@ -135,6 +144,16 @@ locals {
       )
     })
   }
+
+  worker_hostname_patches = {
+    for name, node in local.worker_nodes_by_name : name => yamlencode({
+      apiVersion = "v1alpha1"
+      kind       = "HostnameConfig"
+      auto       = "off"
+      hostname   = node.name
+    })
+  }
+
 }
 
 check "control_plane_nodes_present" {
@@ -156,7 +175,10 @@ data "talos_machine_configuration" "control_plane" {
   examples           = false
 
   config_patches = concat(
-    [local.control_plane_base_patches[each.key]],
+    [
+      local.control_plane_base_patches[each.key],
+      local.control_plane_hostname_patches[each.key],
+    ],
     var.control_plane_config_patches,
     each.value.config_patches
   )
@@ -174,7 +196,10 @@ data "talos_machine_configuration" "worker" {
   examples           = false
 
   config_patches = concat(
-    [local.worker_base_patches[each.key]],
+    [
+      local.worker_base_patches[each.key],
+      local.worker_hostname_patches[each.key],
+    ],
     var.worker_config_patches,
     each.value.config_patches
   )

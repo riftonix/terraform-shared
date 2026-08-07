@@ -7,10 +7,10 @@ output "instances" {
       vmid                 = instance.vmid
       target_node          = instance.target_node
       current_node         = try(instance.current_node, null)
-      default_ipv4_address = try(instance.default_ipv4_address, null)
+      default_ipv4_address = try(coalesce(instance.default_ipv4_address, local.discovered_ipv4_by_node[name]), null)
       default_ipv6_address = try(instance.default_ipv6_address, null)
-      access_ip_v4         = try(instance.default_ipv4_address, null)
-      fixed_ip_v4          = try(instance.default_ipv4_address, null)
+      access_ip_v4         = try(coalesce(instance.default_ipv4_address, local.discovered_ipv4_by_node[name]), null)
+      fixed_ip_v4          = try(var.nodes[name].fixed_ip_v4, null)
       ssh_host             = try(instance.ssh_host, null)
       ssh_port             = try(instance.ssh_port, null)
     }
@@ -22,8 +22,8 @@ output "nodes" {
   value = {
     for name, instance in proxmox_vm_qemu.this : name => {
       name     = name
-      node     = try(instance.default_ipv4_address, null)
-      endpoint = try(instance.default_ipv4_address, null)
+      node     = try(coalesce(instance.default_ipv4_address, local.discovered_ipv4_by_node[name]), null)
+      endpoint = try(coalesce(instance.default_ipv4_address, local.discovered_ipv4_by_node[name]), null)
     }
   }
 }

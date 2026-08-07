@@ -28,9 +28,9 @@ variable "cluster_endpoint_port" {
 variable "control_plane_nodes_map" {
   description = "Control-plane nodes as map keyed by node name. Works with any infra module output that follows this schema."
   type = map(object({
-    name     = string
-    node     = string
-    endpoint = optional(string)
+    name         = string
+    node         = string
+    endpoint     = optional(string)
     install_disk = optional(string)
     labels       = optional(map(string), {})
     taints = optional(list(object({
@@ -84,9 +84,9 @@ variable "control_plane_defaults" {
 variable "worker_node_maps" {
   description = "Worker nodes as list of maps keyed by node name (e.g., from one or many infra modules)."
   type = list(map(object({
-    name     = string
-    node     = string
-    endpoint = optional(string)
+    name         = string
+    node         = string
+    endpoint     = optional(string)
     install_disk = optional(string)
     labels       = optional(map(string), {})
     taints = optional(list(object({
