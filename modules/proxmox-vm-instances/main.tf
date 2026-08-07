@@ -57,11 +57,31 @@ locals {
   }
 
   disks_by_node = {
-    for name, _ in var.nodes : name => merge(
-      local.root_disk_by_node[name],
-      local.data_volumes_by_node[name],
-      local.cloudinit_disk_by_node[name]
-    )
+    for name, _ in var.nodes : name => [
+      for key in sort([
+        for key, disk in merge(
+          local.root_disk_by_node[name],
+          local.data_volumes_by_node[name],
+          local.cloudinit_disk_by_node[name]
+        ) : "${disk.slot}:${key}"
+        ]) : merge(
+        merge(
+          local.root_disk_by_node[name],
+          local.data_volumes_by_node[name],
+          local.cloudinit_disk_by_node[name]
+        )[split(":", key)[1]],
+        {
+          type = try(
+            merge(
+              local.root_disk_by_node[name],
+              local.data_volumes_by_node[name],
+              local.cloudinit_disk_by_node[name]
+            )[split(":", key)[1]].type,
+            "disk"
+          )
+        }
+      )
+    ]
   }
 
   cpu_by_node = {
@@ -141,7 +161,7 @@ resource "proxmox_vm_qemu" "this" {
   qemu_os            = try(each.value.qemu_os, null) != null ? each.value.qemu_os : var.qemu_os
   scsihw             = try(each.value.scsihw, null) != null ? each.value.scsihw : var.scsihw
   boot               = try(each.value.boot, null) != null ? each.value.boot : var.boot
-  bootdisk           = try(each.value.bootdisk, null) != null ? each.value.bootdisk : var.bootdisk
+  bootdisk           = null
   vm_state           = try(each.value.vm_state, null) != null ? each.value.vm_state : var.vm_state
   start_at_node_boot = try(each.value.start_at_node_boot, null) != null ? each.value.start_at_node_boot : var.start_at_node_boot
   protection         = try(each.value.protection, null) != null ? each.value.protection : var.protection
@@ -245,15 +265,15 @@ resource "proxmox_vm_qemu" "this" {
       size                 = try(disk.value.size, null)
       format               = try(disk.value.format, null)
       cache                = try(disk.value.cache, null)
-      discard              = try(disk.value.discard, null)
-      iothread             = try(disk.value.iothread, null)
-      backup               = try(disk.value.backup, null)
-      asyncio              = try(disk.value.asyncio, null)
-      emulatessd           = try(disk.value.emulatessd, null)
-      replicate            = try(disk.value.replicate, null)
-      readonly             = try(disk.value.readonly, null)
-      serial               = try(disk.value.serial, null)
-      wwn                  = try(disk.value.wwn, null)
+      discard              = disk.value.type == "disk" ? try(disk.value.discard, null) : null
+      iothread             = disk.value.type == "disk" ? try(disk.value.iothread, null) : null
+      backup               = disk.value.type == "disk" ? try(disk.value.backup, null) : null
+      asyncio              = disk.value.type == "disk" ? try(disk.value.asyncio, null) : null
+      emulatessd           = disk.value.type == "disk" ? try(disk.value.emulatessd, null) : null
+      replicate            = disk.value.type == "disk" ? try(disk.value.replicate, null) : null
+      readonly             = disk.value.type == "disk" ? try(disk.value.readonly, null) : null
+      serial               = disk.value.type == "disk" ? try(disk.value.serial, null) : null
+      wwn                  = disk.value.type == "disk" ? try(disk.value.wwn, null) : null
       iso                  = try(disk.value.iso, null)
       passthrough          = try(disk.value.passthrough, null)
       disk_file            = try(disk.value.disk_file, null)
@@ -268,6 +288,12 @@ resource "proxmox_vm_qemu" "this" {
       iops_wr_burst_length = try(disk.value.iops_wr_burst_length, null)
       iops_wr_concurrent   = try(disk.value.iops_wr_concurrent, null)
     }
+  }
+
+  startup_shutdown {
+    order            = -1
+    startup_delay    = -1
+    shutdown_timeout = -1
   }
 
   lifecycle {
@@ -288,5 +314,38 @@ resource "proxmox_vm_qemu" "this" {
       )
       error_message = "Each node can resolve at most one clone source: `image_name` or `image_id`."
     }
+  }
+}
+
+data "http" "guest_agent_networks" {
+  for_each = nonsensitive(var.guest_agent_ip_discovery == null) ? {} : {
+    for name, instance in proxmox_vm_qemu.this : name => {
+      target_node = instance.target_node
+      vmid        = instance.vmid
+    }
+  }
+
+  url      = "${var.guest_agent_ip_discovery.api_url}/nodes/${each.value.target_node}/qemu/${each.value.vmid}/agent/network-get-interfaces"
+  insecure = var.guest_agent_ip_discovery.tls_insecure
+
+  request_headers = {
+    Authorization = "PVEAPIToken=${var.guest_agent_ip_discovery.token_id}=${var.guest_agent_ip_discovery.token_secret}"
+  }
+
+  retry {
+    attempts     = var.guest_agent_ip_discovery.retry.attempts
+    min_delay_ms = var.guest_agent_ip_discovery.retry.min_delay_ms
+    max_delay_ms = var.guest_agent_ip_discovery.retry.max_delay_ms
+  }
+}
+
+locals {
+  discovered_ipv4_by_node = {
+    for name, response in data.http.guest_agent_networks : name => one(flatten([
+      for interface in jsondecode(response.response_body).data.result : [
+        for address in try(interface["ip-addresses"], []) : address["ip-address"]
+        if address["ip-address-type"] == "ipv4" && !startswith(address["ip-address"], "127.")
+      ]
+    ]))
   }
 }
