@@ -42,10 +42,11 @@ variable "agent" {
 variable "guest_agent_ip_discovery" {
   description = "Optional Proxmox API configuration used to discover guest IPv4 addresses through QEMU Guest Agent."
   type = object({
-    api_url      = string
-    token_id     = string
-    token_secret = string
-    tls_insecure = optional(bool, false)
+    api_url        = string
+    token_id       = string
+    token_secret   = string
+    tls_insecure   = optional(bool, false)
+    interface_name = optional(string, "eth0")
     retry = optional(object({
       attempts     = optional(number, 10)
       min_delay_ms = optional(number, 3000)
@@ -57,11 +58,12 @@ variable "guest_agent_ip_discovery" {
 
   validation {
     condition = var.guest_agent_ip_discovery == null || (
+      trimspace(var.guest_agent_ip_discovery.interface_name) != "" &&
       var.guest_agent_ip_discovery.retry.attempts >= 0 &&
       var.guest_agent_ip_discovery.retry.min_delay_ms >= 0 &&
       var.guest_agent_ip_discovery.retry.max_delay_ms >= var.guest_agent_ip_discovery.retry.min_delay_ms
     )
-    error_message = "Guest agent retry attempts and delays must be non-negative, and max_delay_ms must be greater than or equal to min_delay_ms."
+    error_message = "Guest agent interface_name must not be empty; retry attempts and delays must be non-negative, and max_delay_ms must be greater than or equal to min_delay_ms."
   }
 }
 
