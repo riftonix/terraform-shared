@@ -344,7 +344,7 @@ locals {
     for name, response in data.http.guest_agent_networks : name => one(flatten([
       for interface in jsondecode(response.response_body).data.result : [
         for address in try(interface["ip-addresses"], []) : address["ip-address"]
-        if address["ip-address-type"] == "ipv4" && !startswith(address["ip-address"], "127.")
+        if interface.name == nonsensitive(var.guest_agent_ip_discovery.interface_name) && address["ip-address-type"] == "ipv4"
       ]
     ]))
   }
