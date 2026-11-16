@@ -61,10 +61,11 @@ locals {
   }
 
   # Each domain in DNS wire format: every label is preceded by its length byte.
+  # RouterOS rejects a NUL in a regexp, so the group has no \x00 terminator.
   dns_resolver_layer7 = {
     for name, egress in local.dns_resolver_egresses : name => {
       name = "egress-${name}-dns"
-      regexp = format("(%s)\\x00", join("|", [
+      regexp = format("(%s)", join("|", [
         for domain in egress.dns_resolver.domains : join("", [
           for label in split(".", domain) : format("\\x%02x%s", length(label), label)
         ])

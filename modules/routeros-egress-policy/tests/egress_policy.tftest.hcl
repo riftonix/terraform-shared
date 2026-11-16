@@ -58,7 +58,7 @@ run "layer7_regexp_for_crpt_domains" {
   }
 
   assert {
-    condition     = routeros_ip_firewall_layer7_protocol.dns_resolver["crpt"].regexp == "(\\x04crpt\\x05local|\\x04crpt\\x04tech|\\x04crpt\\x02ru|\\x07crptech\\x02ru|\\x04crpt\\x05cloud|\\x04crpt\\x08intranet|\\x05ittds\\x04tech|\\x08trekmark\\x02ru|\\x04crpt\\x04team)\\x00"
+    condition     = routeros_ip_firewall_layer7_protocol.dns_resolver["crpt"].regexp == "(\\x04crpt\\x05local|\\x04crpt\\x04tech|\\x04crpt\\x02ru|\\x07crptech\\x02ru|\\x04crpt\\x05cloud|\\x04crpt\\x08intranet|\\x05ittds\\x04tech|\\x08trekmark\\x02ru|\\x04crpt\\x04team)"
     error_message = "The layer7 regexp must encode the domains in DNS wire format."
   }
 
@@ -84,7 +84,7 @@ run "layer7_length_byte_in_hex" {
   }
 
   assert {
-    condition     = routeros_ip_firewall_layer7_protocol.dns_resolver["long"].regexp == "(\\x16abcdefghijklmnopqrstuv\\x02ru)\\x00"
+    condition     = routeros_ip_firewall_layer7_protocol.dns_resolver["long"].regexp == "(\\x16abcdefghijklmnopqrstuv\\x02ru)"
     error_message = "The length byte must be two lowercase hex digits."
   }
 }
