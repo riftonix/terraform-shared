@@ -100,6 +100,7 @@ resource "routeros_ip_firewall_filter" "drop_forward" {
   dst_address      = try(each.value.dst_address, null)
   src_address_list = try(each.value.src_address_list, null)
   dst_address_list = try(each.value.dst_address_list, null)
+  connection_state = try(each.value.connection_state, null)
   comment          = coalesce(try(each.value.comment, null), "Drop forward ${each.key}")
 
   depends_on = [routeros_ip_firewall_filter.allowed_forward]

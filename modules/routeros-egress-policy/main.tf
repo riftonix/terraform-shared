@@ -7,7 +7,7 @@ locals {
   egress_has_address_list_policy = {
     for name, egress in var.egresses : name => (
       length(coalesce(try(egress.destination_prefixes, null), [])) > 0
-      || length(coalesce(try(egress.dns_names, null), [])) > 0
+      || length(coalesce(try(egress.destination_domains, null), [])) > 0
     )
   }
 
@@ -42,15 +42,51 @@ locals {
   dns_name_rules = {
     for entry in flatten([
       for egress_name, egress in var.egresses : [
-        for name in coalesce(try(egress.dns_names, null), []) : {
+        for name in coalesce(try(egress.destination_domains, null), []) : {
           key          = "${egress_name}-${replace(name, ".", "-")}"
           egress_name  = egress_name
           name         = name
           address_list = local.destination_address_lists[egress_name]
-          forward_to   = length(coalesce(try(egress.dns_forward_to, null), [])) > 0 ? egress.dns_forward_to[0] : var.dns_forward_to[0]
+          forward_to   = var.destination_domains_upstream[0]
           comment      = coalesce(try(egress.comment, null), "Egress ${egress_name}")
         }
         if local.egress_has_address_list_policy[egress_name]
+      ]
+    ]) : entry.key => entry
+  }
+
+  dns_resolver_egresses = {
+    for name, egress in var.egresses : name => egress
+    if try(egress.dns_resolver, null) != null
+  }
+
+  # Each domain in DNS wire format: every label is preceded by its length byte.
+  dns_resolver_layer7 = {
+    for name, egress in local.dns_resolver_egresses : name => {
+      name = "egress-${name}-dns"
+      regexp = format("(%s)\\x00", join("|", [
+        for domain in egress.dns_resolver.domains : join("", [
+          for label in split(".", domain) : format("\\x%02x%s", length(label), label)
+        ])
+      ]))
+    }
+  }
+
+  dns_resolver_rules = {
+    for entry in flatten([
+      for egress_name, egress in local.dns_resolver_egresses : [
+        for source_name, source in var.sources : [
+          for index, server in egress.dns_resolver.servers : {
+            key                       = "${egress_name}-${source_name}-${index}"
+            egress_name               = egress_name
+            in_interface              = try(source.in_interface, null)
+            src_address               = local.source_src_addresses[source_name]
+            to_addresses              = server
+            per_connection_classifier = length(egress.dns_resolver.servers) > 1 ? "both-addresses-and-ports:${length(egress.dns_resolver.servers)}/${index}" : null
+            comment                   = coalesce(try(egress.comment, null), "Egress ${egress_name}")
+          }
+        ]
+        if contains(local.source_allowed_egresses[source_name], egress_name)
       ]
     ]) : entry.key => entry
   }
@@ -169,6 +205,30 @@ resource "routeros_ip_dns_record" "egress_name" {
   address_list    = each.value.address_list
   disabled        = false
   comment         = "${each.value.comment} DNS address-list"
+}
+
+resource "routeros_ip_firewall_layer7_protocol" "dns_resolver" {
+  for_each = local.dns_resolver_layer7
+
+  name   = each.value.name
+  regexp = each.value.regexp
+}
+
+resource "routeros_ip_firewall_nat" "dns_resolver" {
+  for_each = local.dns_resolver_rules
+
+  chain                     = "dstnat"
+  action                    = "dst-nat"
+  protocol                  = "udp"
+  dst_port                  = "53"
+  dst_address_type          = "local"
+  in_interface              = each.value.in_interface
+  src_address               = each.value.src_address
+  layer7_protocol           = routeros_ip_firewall_layer7_protocol.dns_resolver[each.value.egress_name].name
+  per_connection_classifier = each.value.per_connection_classifier
+  to_addresses              = each.value.to_addresses
+  to_ports                  = "53"
+  comment                   = "${each.value.comment} DNS resolver"
 }
 
 resource "routeros_ip_firewall_addr_list" "destination" {

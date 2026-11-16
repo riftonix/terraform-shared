@@ -16,17 +16,20 @@ variable "sources" {
 }
 
 variable "egresses" {
-  description = "Named egress targets and optional DNS-derived destination lists"
+  description = "Named egress targets, optional DNS-derived destination lists and optional split DNS resolvers"
   type = map(object({
     routing_table               = optional(string, "main")
     gateway                     = optional(string)
     destination_prefixes        = optional(list(string), [])
     static_destination_prefixes = optional(list(string), [])
-    dns_names                   = optional(list(string), [])
-    dns_forward_to              = optional(list(string), [])
-    connection_mark             = optional(string)
-    routing_mark                = optional(string)
-    comment                     = optional(string)
+    destination_domains         = optional(list(string), [])
+    dns_resolver = optional(object({
+      domains = list(string)
+      servers = list(string)
+    }))
+    connection_mark = optional(string)
+    routing_mark    = optional(string)
+    comment         = optional(string)
   }))
 
   validation {
@@ -43,6 +46,34 @@ variable "egresses" {
       length(coalesce(try(egress.static_destination_prefixes, null), [])) == 0 || try(egress.gateway, null) != null
     ])
     error_message = "Each egress with static_destination_prefixes must set gateway."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, egress in var.egresses :
+      try(egress.dns_resolver, null) == null || (length(egress.dns_resolver.domains) > 0 && length(egress.dns_resolver.servers) > 0)
+    ])
+    error_message = "dns_resolver.domains and dns_resolver.servers must not be empty."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, egress in var.egresses : [
+        for server in try(egress.dns_resolver.servers, []) :
+        can(regex("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", server)) && can(cidrhost("${server}/32", 0))
+      ]
+    ]))
+    error_message = "dns_resolver.servers must be IPv4 addresses without a prefix length."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, egress in var.egresses : [
+        for domain in try(egress.dns_resolver.domains, []) :
+        can(regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$", domain))
+      ]
+    ]))
+    error_message = "dns_resolver.domains must be lowercase DNS names without a trailing dot."
   }
 }
 
@@ -68,13 +99,13 @@ variable "chain" {
   default     = "prerouting"
 }
 
-variable "dns_forward_to" {
-  description = "Default DNS servers used by FWD records that populate address lists"
+variable "destination_domains_upstream" {
+  description = "DNS servers of the FWD records that populate address lists from destination_domains; the first entry is used"
   type        = list(string)
   default     = ["1.1.1.1"]
 
   validation {
-    condition     = length(var.dns_forward_to) > 0
-    error_message = "dns_forward_to must contain at least one DNS server."
+    condition     = length(var.destination_domains_upstream) > 0
+    error_message = "destination_domains_upstream must contain at least one DNS server."
   }
 }
