@@ -56,6 +56,7 @@ variable "drop_forwards" {
     dst_address      = optional(string)
     src_address_list = optional(string)
     dst_address_list = optional(string)
+    connection_state = optional(string)
     comment          = optional(string)
   }))
   default = {}

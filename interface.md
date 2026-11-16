@@ -61,8 +61,12 @@ variable "egresses" {
     destination_prefixes        = optional(set(string), [])
     destination_prefix_sets     = optional(set(string), [])
     static_destination_prefixes = optional(set(string), [])
-    dns_names                   = optional(set(string), [])
-    dns_forward_to              = optional(list(string), [])
+    destination_domains         = optional(set(string), [])
+
+    dns_resolver = optional(object({
+      domains = list(string)
+      servers = list(string)
+    }))
 
     allow_sources = optional(bool, true)
     create_nat    = optional(bool, false)
@@ -78,7 +82,7 @@ variable "egresses" {
       routing_table            = "to-kz"
       gateway                  = "wg-backbone"
       destination_prefix_sets  = ["kz_asns"]
-      dns_names                = [
+      destination_domains      = [
         "ipinfo.io",
         "speedtest.net",
         "youtube.com",
@@ -113,12 +117,21 @@ variable "egresses" {
 
 `gateway` в этой переменной - имя RouterOS-интерфейса. Если интерфейс создается Terraform-модулем, `main.tf` может заменить это имя на output модуля, но в переменной все равно должно быть видно, куда логически направляется трафик.
 
+Исключение - egress через контейнер (`routeros-container`): маршрут идет на адрес контейнера, поэтому `gateway` в `routeros-egress-policy` - это `egress.gateway` модуля (IP-адрес), а интерфейс для `out_interface` forward-, drop- и srcnat-правил берется из `egress.interface`.
+
 Для egress есть две модели маршрутизации:
 
 - `destination_prefixes` - policy-routing модель, как у `kz`: подсети попадают в address-list, клиенты получают routing mark, а отдельная routing table содержит default route через `gateway`.
 - `static_destination_prefixes` - route-модель: подсети получают явные `/ip route` в `main` через `gateway`.
 
 Для Cryptotrek используем `destination_prefixes`, чтобы доступ к удаленным подсетям получали только клиенты с `allowed_egress = "cryptotrek"`. Это исключает общий маршрут в `main` и не дает другим road-warrior клиентам случайно использовать OpenVPN-интерфейс.
+
+DNS-атрибуты egress делятся на маршрутизацию и разрешение имен:
+
+- `destination_domains` - маршрутизация. Для каждого домена создается router-wide `FWD`-запись с `match-subdomain`, и IP-адреса из ответов попадают в address-list `egress-<name>`. Ответы для этих записей приходят от `destination_domains_upstream` модуля (по умолчанию `["1.1.1.1"]`, используется первый адрес). Ключи записей - `<egress>-<домен через дефисы>`.
+- `dns_resolver` - разрешение имен, как split DNS. UDP-запросы к адресу роутера на порт 53 от клиентов, у которых egress есть в `allowed_egress`, для имен из `domains` и их поддоменов перенаправляются через `dstnat` на `servers`. Имена сравниваются layer7-протоколом `egress-<name>-dns` в DNS wire format. Правило на каждую пару клиент/сервер имеет ключ `<egress>-<source>-<индекс сервера>`; при нескольких серверах запросы делятся через PCC `both-addresses-and-ports:n/i`, без failover. `dns_resolver` ничего не добавляет в address-list и не решает, какой трафик уходит в egress.
+
+Перенаправленный запрос маршрутизируется по `main`: mangle-правила срабатывают до `dstnat`, а адрес роутера в bypass. Поэтому серверу за VPN-интерфейсом нужен маршрут в `main` (например, через `static_destination_prefixes`), а сервер на линке контейнера доступен через connected route. Домены в `dns_resolver` - lowercase-имена без точки в конце, серверы - IPv4-адреса без длины префикса, оба списка не пустые.
 
 ### Prefix set
 
@@ -213,6 +226,69 @@ variable "cryptotrek_openvpn_key_passphrase" {
 }
 ```
 
+### Container
+
+Контейнер RouterOS с собственным point-to-point линком. Для каждого контейнера используем один экземпляр `routeros-container`.
+
+```hcl
+module "rurouter_app" {
+  source = "git::https://github.com/riftonix/terraform-shared.git//modules/routeros-container?ref=routeros-container/0.1.0"
+
+  providers = {
+    routeros = routeros.rurouter
+  }
+
+  name         = "app"
+  remote_image = "ghcr.io/example/app:1.0.0"
+  root_dir     = "<disk>/containers/app"
+
+  network = {
+    router_address    = "172.18.0.1/30"
+    container_address = "172.18.0.2/30"
+  }
+
+  envs = local.app_envs
+
+  egress = {
+    name = "app"
+  }
+}
+```
+
+Модуль создает:
+
+- veth-интерфейс `network.interface_name` (по умолчанию `veth-<name>`) с адресом контейнера и шлюзом - адресом роутера;
+- адрес роутера `network.router_address` на этом интерфейсе;
+- по одной записи `/container/envs` на каждый ключ `envs` в списке с именем `name`;
+- контейнер из `remote_image` с `root_dir`, `devices`, `dns`, `memory_high`, `logging`, `check_certificate`, `auto_restart_interval` и `comment` (по умолчанию `Container <name>`).
+
+Адреса задаются в CIDR-форме, у них должны совпадать длина префикса и сеть, а host-адреса должны различаться; иначе валидация `network` не проходит.
+
+`envs` - sensitive map. Секреты в нее приходят из стека (например, из Bitwarden), в переменные с `default` их не кладем. Изменение значения меняет только запись `/container/envs`, а не контейнер; RouterOS читает окружение при старте, поэтому новое значение начинает действовать со следующего запуска.
+
+Политика запуска - ручной старт:
+
+- `start_on_create = false` (по умолчанию): новый контейнер создается остановленным. `running` берется из этой переменной только при создании, дальнейшие ручные start/stop и изменение `start_on_create` в план не попадают;
+- `start_on_boot = false` (по умолчанию): после перезагрузки роутера контейнер не стартует сам;
+- `auto_restart_interval` по умолчанию не задан.
+
+Смена `remote_image` пересоздает контейнер, и он снова создается остановленным. Остальные атрибуты меняются in place: провайдер останавливает запущенный контейнер и запускает его снова, поэтому такие изменения применяем при остановленном контейнере.
+
+Output `egress` (только если задан `var.egress`) подходит для `routeros-egress-policy`:
+
+```hcl
+{
+  routing_table = "to-<egress.name>" # или egress.routing_table
+  gateway       = "<host-адрес контейнера>"
+  interface     = "<veth-интерфейс>"
+  comment       = "<comment>"
+}
+```
+
+`gateway` - IP-адрес, а не имя интерфейса, поэтому в firewall используем `interface`. Кроме `egress` модуль отдает `interface_name`, `router_address` и `container_address` (host-адреса без длины префикса) и `container_id`.
+
+Router-wide настройки контейнеров (`/container/config`: registry, tmpdir, лимиты) модуль не создает: они общие для всех контейнеров роутера, поэтому `routeros_container_config` остается в стеке. Монтирований (`mounts`) модуль не поддерживает.
+
 ## Как должен выглядеть `main.tf`
 
 ### Нормализация входа
@@ -253,8 +329,8 @@ egresses = {
     gateway                     = local.egress_gateways[name]
     destination_prefixes        = local.egress_destination_prefixes[name]
     static_destination_prefixes = egress.static_destination_prefixes
-    dns_names                   = egress.dns_names
-    dns_forward_to              = egress.dns_forward_to
+    destination_domains         = egress.destination_domains
+    dns_resolver                = egress.dns_resolver
     comment                     = egress.comment
   }
 }
@@ -300,6 +376,8 @@ drop_forwards = {
 ```
 
 Это блокирует попытку отправить через VPN трафик, который не был явно разрешен через `allowed_egress` и маршрутизируемые подсети egress.
+
+Запись `drop_forwards` может задать `connection_state` - строку через запятую, как в провайдере, например `"new,invalid"`. Тогда правило отбрасывает только соединения в этих состояниях, а ответы на соединения, которые начал сам egress (например, контейнер), проходят. Без `connection_state` правило отбрасывает весь трафик, как раньше.
 
 NAT-правила строятся из тех же данных, но только для egress, где `create_nat = true`:
 
@@ -369,7 +447,7 @@ riftmob = {
 Добавить `variable "egresses"` и перенести туда:
 
 - `cryptotrek.destination_prefixes`;
-- `kz.dns_names`;
+- `kz.destination_domains`;
 - комментарии egress;
 - routing table names.
 
@@ -400,9 +478,11 @@ riftmob = {
 ## Инварианты
 
 - `allowed_egress` - единственное место, где задается, какие клиенты имеют право использовать egress.
-- `egresses[*].destination_prefixes`, `egresses[*].static_destination_prefixes` и `egresses[*].dns_names` - единственное место, где задается, какой трафик уходит в egress.
+- `egresses[*].destination_prefixes`, `egresses[*].static_destination_prefixes` и `egresses[*].destination_domains` - единственное место, где задается, какой трафик уходит в egress.
+- `egresses[*].dns_resolver` задает только, через какие DNS-серверы разрешенные клиенты разрешают имена; на маршрутизацию он не влияет.
 - `main.tf` не содержит списков клиентов под конкретный egress.
 - `main.tf` не содержит prefix/dns lists под конкретный egress, кроме временных bridge-locals на этапе миграции.
 - OpenVPN-модуль не знает про firewall.
 - Firewall не знает про конкретный Cryptotrek, только про общий egress contract.
 - Один `routeros-openvpn-client` создает один RouterOS OpenVPN client interface.
+- Один `routeros-container` создает один контейнер с его veth-линком; router-wide настройки контейнеров остаются в стеке.
